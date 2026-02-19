@@ -30,10 +30,7 @@
 }
 
 .bespoke .header h1 {
-  font-size: var(--Fonts-Body-Default-lg);
   margin: 0;
-  font-weight: 600;
-  font-family: var(--heading-family);
   color: var(--Colors-Text-Body-Strongest);
 }
 
@@ -85,22 +82,22 @@
 
 /* ===== TEMPORARY COMPONENTS (TODO: Replace when design system adds these) ===== */
 
-/* Form Elements - TODO: Remove when design system adds form components */
-.bespoke label {
+/* Form Elements - Generic labels only; exclude .input-checkbox and .input-radio (design system components) */
+.bespoke label:not(.input-checkbox):not(.input-radio) {
   display: flex;
   flex-direction: column;
   gap: var(--UI-Spacing-spacing-xxs);
   margin: var(--UI-Spacing-spacing-ms) 0 var(--UI-Spacing-spacing-s) 0;
 }
 
-.bespoke label.row {
+.bespoke label.row:not(.input-checkbox):not(.input-radio) {
   flex-direction: row;
   align-items: center;
   gap: var(--UI-Spacing-spacing-s);
   margin: var(--UI-Spacing-spacing-s) 0;
 }
 
-/* Select styling - TODO: Remove when design system adds select component */
+/* Select styling - TODO: Replace when design system adds select component */
 .bespoke select {
   -webkit-appearance: none;
   -moz-appearance: none;
@@ -174,7 +171,6 @@
 
 .bespoke .toggle-label {
   margin-left: var(--UI-Spacing-spacing-s);
-  font-size: var(--Fonts-Body-Default-xs);
   color: var(--Colors-Text-Body-Default);
   cursor: pointer;
 }

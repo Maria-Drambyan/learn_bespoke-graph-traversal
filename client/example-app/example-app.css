@@ -12,8 +12,6 @@
 }
 
 .bespoke .sidebar-section h2 {
-  font-size: var(--Fonts-Headlines-sm);
-  font-weight: 600;
   color: var(--Colors-Text-Body-Strongest);
   margin: 0 0 var(--UI-Spacing-spacing-ml) 0;
 }
@@ -25,8 +23,6 @@
 }
 
 .bespoke .control-group label {
-  font-size: var(--Fonts-Body-Default-sm);
-  font-weight: 500;
   color: var(--Colors-Text-Body-Strong);
 }
 
@@ -60,21 +56,19 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: var(--UI-Spacing-spacing-2xl);
+  padding: var(--UI-Spacing-spacing-xxxl);
   text-align: center;
 }
 
 .bespoke .counter-display h2 {
-  font-size: var(--Fonts-Headlines-sm);
-  font-weight: 600;
   color: var(--Colors-Text-Body-Strong);
   margin: 0 0 var(--UI-Spacing-spacing-ml) 0;
   text-align: center;
 }
 
 .bespoke .counter-value {
-  font-size: 4rem;
-  font-weight: 700;
+  font-size: var(--Fonts-Headlines-xxl);
+  font-weight: 500;
   font-family: var(--heading-family);
   color: var(--Colors-Text-Body-Strongest);
   line-height: 1;
@@ -96,15 +90,12 @@
 }
 
 .bespoke .settings-display h3 {
-  font-size: var(--Fonts-Headlines-xs);
-  font-weight: 600;
   color: var(--Colors-Text-Body-Strong);
   margin: 0 0 var(--UI-Spacing-spacing-ml) 0;
   width: 100%;
 }
 
 .bespoke .setting-item {
-  font-size: var(--Fonts-Body-Default-sm);
   color: var(--Colors-Text-Body-Default);
   margin-bottom: var(--UI-Spacing-spacing-s);
   width: 100%;

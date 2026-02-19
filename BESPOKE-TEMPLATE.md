@@ -21,7 +21,7 @@ Every application should include these files in the following order:
    - components/tags/tags.css
 3. bespoke-template.css (template-specific layout, utilities, temporary
    components)
-4. help-modal.js (help system)
+4. components/modal/modal.css and modal.js (design system; used for help modal)
 5. app.js (application logic)
 6. server.js (server)
 
@@ -79,10 +79,8 @@ Every application should include these files in the following order:
 
 1. HELP MODAL SETUP:
    a) Create help content using help-content-template.html as reference
-   b) Initialize HelpModal with:
-      - triggerSelector: `'#btn-help'`
-      - content: your help content (string or loaded from file)
-      - theme: `'auto'`
+   b) Use the design system Modal: `Modal.createHelpModal({ title: 'Help', content, triggerSelector: '#btn-help' })`
+   c) Include `modal.css` and import `Modal` from `design-system/components/modal/modal.js`
 
 ## Error Handling Requirements
 
@@ -204,13 +202,7 @@ when the design system adds them.
 ```html
 <!-- Vertical label -->
 <label>Field Name
-  <input type="text" />
-</label>
-
-<!-- Horizontal label -->
-<label class="row">
-  <input type="checkbox" />
-  Checkbox Label
+  <input type="text" class="input" />
 </label>
 ```
 
@@ -220,49 +212,41 @@ when the design system adds them.
 <!-- Text input -->
 <input type="text" class="input" placeholder="Enter text" />
 
-<!-- Select dropdown -->
+<!-- Select dropdown - native select styling is custom; design system has a Dropdown JS component for richer dropdowns -->
 <select class="input">
   <option>Option 1</option>
   <option>Option 2</option>
 </select>
 
-<!-- Checkbox -->
-<input type="checkbox" />
+<!-- Checkbox (design system component) -->
+<label class="input-checkbox">
+  <input type="checkbox" />
+  <span class="input-checkbox-box"><span class="input-checkbox-checkmark"></span></span>
+  <span class="input-checkbox-label">Checkbox Label</span>
+</label>
 
-<!-- Radio buttons -->
-<div class="radio-group">
-  <label class="row">
-    <input type="radio" name="option" value="a" />
-    Option A
-  </label>
-  <label class="row">
-    <input type="radio" name="option" value="b" />
-    Option B
-  </label>
-</div>
-
-<!-- Horizontal radio group -->
-<div class="radio-group horizontal">
-  <label class="row">
-    <input type="radio" name="size" value="small" />
-    Small
-  </label>
-  <label class="row">
-    <input type="radio" name="size" value="large" />
-    Large
-  </label>
-</div>
+<!-- Radio buttons (design system component) -->
+<label class="input-radio">
+  <input type="radio" name="option" value="a" />
+  <span class="input-radio-circle"><span class="input-radio-dot"></span></span>
+  <span class="input-radio-label">Option A</span>
+</label>
+<label class="input-radio">
+  <input type="radio" name="option" value="b" />
+  <span class="input-radio-circle"><span class="input-radio-dot"></span></span>
+  <span class="input-radio-label">Option B</span>
+</label>
 
 <!-- Textarea -->
-<textarea placeholder="Enter your message here..."></textarea>
+<textarea class="input" placeholder="Enter your message here..."></textarea>
 
-<!-- Toggle switch -->
+<!-- Toggle switch - custom component; no design system equivalent yet. Add body-xsmall for typography -->
 <label class="row">
   <div class="toggle">
     <input type="checkbox" class="toggle-input" />
     <span class="toggle-slider"></span>
   </div>
-  <span class="toggle-label">Enable notifications</span>
+  <span class="toggle-label body-xsmall">Enable notifications</span>
 </label>
 ```
 
@@ -281,83 +265,26 @@ when the design system adds them.
 <a href="#" class="button button-text">Link Button</a>
 ```
 
-### Modal Components
+### Modal (Help)
 
-#### Basic Modal
+Use the design system Modal component for help/documentation:
 
-```html
-<div class="modal">
-  <div class="modal-backdrop"></div>
-  <div class="modal-content">
-    <div class="modal-header">
-      <h2>Modal Title</h2>
-      <button class="modal-close">&times;</button>
-    </div>
-    <div class="modal-body">
-      <p>Modal content goes here</p>
-    </div>
-  </div>
-</div>
+```javascript
+import Modal from './design-system/components/modal/modal.js';
+
+const helpModal = Modal.createHelpModal({
+  title: 'Help',
+  content: document.querySelector('#help-content').content.cloneNode(true),
+  triggerSelector: '#btn-help'
+});
+helpModal.open();
 ```
+
+Include `modal.css` and `modal.js` in your app. See `client/design-system/components/modal/README.md` for full API.
 
 ## Customization
 
-### CSS Custom Properties
-
-You can override any CSS custom property to customize the appearance:
-
-```css
-.bespoke {
-  /* Override colors */
-  --bespoke-bg: #f0f0f0;
-  --bespoke-fg: #333333;
-  --bespoke-accent: #ff6b6b;
-
-  /* Override spacing */
-  --bespoke-space-lg: 1.5rem;
-
-  /* Override border radius */
-  --bespoke-radius-lg: 12px;
-}
-```
-
-### Available Custom Properties
-
-#### Colors
-
-- `--bespoke-bg`: Background color
-- `--bespoke-fg`: Text color
-- `--bespoke-muted`: Muted text color
-- `--bespoke-box`: Container/surface background
-- `--bespoke-stroke`: Border color
-- `--bespoke-danger`: Error/danger color
-- `--bespoke-accent`: Accent/primary color
-- `--bespoke-control-bg`: Input/button background
-- `--bespoke-control-border`: Input/button border
-- `--bespoke-control-focus`: Focus ring color
-
-#### Spacing
-
-- `--bespoke-space-xs`: 0.25rem
-- `--bespoke-space-sm`: 0.5rem
-- `--bespoke-space-md`: 0.75rem
-- `--bespoke-space-lg`: 1rem
-- `--bespoke-space-xl`: 1.5rem
-- `--bespoke-space-2xl`: 2rem
-
-#### Border Radius
-
-- `--bespoke-radius-sm`: 4px
-- `--bespoke-radius-md`: 6px
-- `--bespoke-radius-lg`: 8px
-- `--bespoke-radius-xl`: 12px
-
-#### Shadows
-
-- `--bespoke-shadow-sm`: Small shadow
-- `--bespoke-shadow-md`: Medium shadow
-- `--bespoke-shadow-lg`: Large shadow
-- `--bespoke-shadow-xl`: Extra large shadow
+Customize via design system CSS variables (`--Colors-*`, `--UI-Spacing-*`, `--Fonts-*`, `--UI-Radius-*`). See design system files for available tokens.
 
 ## Theme Support
 
