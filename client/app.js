@@ -1,16 +1,10 @@
+// app.js
 import Modal from './design-system/components/modal/modal.js';
-import SimulationLoader from './simulation-loader.js';
-import EventBus from './event-bus.js';
-import TabNotifier from './tab-notifier.js';
-import ScenarioEngine from './scenario-engine.js';
 
 let websocket = null;
 let helpModal = null;
-let loader = null;
-let eventBus = null;
-let notifier = null;
-let scenarioEngine = null;
 
+// Initialize WebSocket connection
 function initializeWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.host;
@@ -19,34 +13,31 @@ function initializeWebSocket() {
   try {
     websocket = new WebSocket(wsUrl);
 
-    websocket.onopen = () => {
+    websocket.onopen = function(event) {
       console.log('WebSocket connected');
     };
 
-    websocket.onmessage = (event) => {
+    websocket.onmessage = function(event) {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'message' && data.message) {
-          if (loader) {
-            loader.sendMessage(data);
-          } else {
-            alert(data.message);
-          }
+          alert(data.message);
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
       }
     };
 
-    websocket.onclose = () => {
+    websocket.onclose = function(event) {
       console.log('WebSocket disconnected');
+      // Attempt to reconnect after 3 seconds
       setTimeout(() => {
         console.log('Attempting to reconnect WebSocket...');
         initializeWebSocket();
       }, 3000);
     };
 
-    websocket.onerror = (error) => {
+    websocket.onerror = function(error) {
       console.error('WebSocket error:', error);
     };
   } catch (error) {
@@ -54,6 +45,7 @@ function initializeWebSocket() {
   }
 }
 
+// Load help content and initialize modal
 async function initializeHelpModal() {
   try {
     const response = await fetch('./help-content.html');
@@ -66,13 +58,15 @@ async function initializeHelpModal() {
 
     const helpButton = document.getElementById('btn-help');
     if (helpButton) {
-      helpButton.addEventListener('click', () => helpModal.open());
+      helpButton.addEventListener('click', () => {
+        helpModal.open();
+      });
     }
   } catch (error) {
     console.error('Failed to load help content:', error);
     helpModal = Modal.createHelpModal({
       title: 'Help / User Guide',
-      content: '<p>Help content could not be loaded.</p>'
+      content: '<p>Help content could not be loaded. Please check that help-content.html exists.</p>'
     });
     const helpButton = document.getElementById('btn-help');
     if (helpButton) {
@@ -81,53 +75,10 @@ async function initializeHelpModal() {
   }
 }
 
-async function initializeSimulations() {
-  const containerEl = document.getElementById('sim-container');
-  const tabBarEl = document.getElementById('sim-tab-bar');
-
-  eventBus = new EventBus();
-
-  loader = new SimulationLoader({
-    containerEl,
-    tabBarEl,
-    eventBus,
-    onActivate: (simId) => {
-      console.log(`Simulation activated: ${simId}`);
-      if (notifier) notifier.clearBadge(simId);
-    },
-    onDeactivate: (simId) => {
-      console.log(`Simulation deactivated: ${simId}`);
-    }
-  });
-
-  notifier = new TabNotifier(loader);
-  scenarioEngine = new ScenarioEngine({ eventBus, loader, notifier });
-
-  try {
-    const configRes = await fetch('/simulations/simulations.json');
-    const config = await configRes.json();
-
-    await loader.loadConfig('/simulations/simulations.json');
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const scenarioParam = urlParams.get('scenario') || config.scenario;
-    if (scenarioParam) {
-      await scenarioEngine.loadScenario(`/simulations/scenarios/${scenarioParam}.js`);
-    }
-  } catch (error) {
-    console.error('Failed to load simulations config:', error);
-    containerEl.innerHTML = `
-      <div class="sim-empty">
-        <p>No simulations configured. Place simulations.json in the simulations/ directory.</p>
-      </div>
-    `;
-  }
-}
-
+// Initialize both help modal and WebSocket when DOM is ready
 async function initialize() {
   await initializeHelpModal();
   initializeWebSocket();
-  await initializeSimulations();
 }
 
 if (document.readyState === 'loading') {
@@ -135,5 +86,3 @@ if (document.readyState === 'loading') {
 } else {
   initialize();
 }
-
-export { eventBus, loader, notifier, scenarioEngine };

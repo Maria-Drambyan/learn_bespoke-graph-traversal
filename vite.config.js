@@ -3,21 +3,11 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   root: './client',
   server: {
+    host: '0.0.0.0',
     hmr: true,
     allowedHosts: true,
     port: 3000,
-    fs: {
-      allow: ['..']
-    },
     proxy: {
-      '/api': {
-        target: 'http://localhost:3001',
-        changeOrigin: true
-      },
-      '/simulations': {
-        target: 'http://localhost:3001',
-        changeOrigin: true
-      },
       '/message': {
         target: 'http://localhost:3001',
         changeOrigin: true
@@ -34,3 +24,4 @@ export default defineConfig({
     emptyOutDir: true
   }
 });
+

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Simulations</title>
+  <title><!-- APP_TITLE --></title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <!-- Fonts (Work Sans) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,27 +22,24 @@
   <link rel="stylesheet" href="./design-system/components/tags/tags.css">
   <link rel="stylesheet" href="./design-system/components/modal/modal.css">
 
-  <!-- Template + Host styles -->
+  <!-- Template-specific components (layout, utilities, temporary components) -->
   <link rel="stylesheet" href="./bespoke-template.css" />
-  <link rel="stylesheet" href="./super-simulation.css" />
+  <!-- APP_SPECIFIC_CSS -->
 </head>
 <body class="bespoke">
   <!-- Navigation Header -->
   <header class="header">
-    <h1 class="heading-small">Simulations</h1>
-    <nav class="sim-tab-bar" id="sim-tab-bar"></nav>
+    <h1 class="heading-small">APP NAME</h1>
+    <!-- APP_SPECIFIC_HEADER_CONTENT -->
     <div class="spacer"></div>
     <button id="btn-help" class="button button-text">Help</button>
   </header>
 
-  <!-- Simulation Container -->
-  <main class="sim-container" id="sim-container">
-    <div class="sim-empty" id="sim-empty">
-      <p>Select a simulation tab to begin.</p>
-    </div>
-  </main>
+  <!-- Main Application Content -->
+  <!-- APP_SPECIFIC_MAIN_CONTENT -->
 
   <!-- Core Scripts -->
   <script type="module" src="./app.js"></script>
+  <!-- APP_SPECIFIC_SCRIPTS -->
 </body>
 </html>
