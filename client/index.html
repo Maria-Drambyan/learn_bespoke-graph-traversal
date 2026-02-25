@@ -2,19 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title><!-- APP_TITLE --></title>
+  <title>Graph Drive Simulator</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Fonts (Work Sans) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <!-- Design System Foundations -->
   <link rel="stylesheet" href="./design-system/colors/colors.css">
   <link rel="stylesheet" href="./design-system/spacing/spacing.css">
   <link rel="stylesheet" href="./design-system/typography/typography.css">
 
-  <!-- Design System Components -->
   <link rel="stylesheet" href="./design-system/components/button/button.css">
   <link rel="stylesheet" href="./design-system/components/boxes/boxes.css">
   <link rel="stylesheet" href="./design-system/components/input/input.css">
@@ -22,24 +19,61 @@
   <link rel="stylesheet" href="./design-system/components/tags/tags.css">
   <link rel="stylesheet" href="./design-system/components/modal/modal.css">
 
-  <!-- Template-specific components (layout, utilities, temporary components) -->
   <link rel="stylesheet" href="./bespoke-template.css" />
-  <!-- APP_SPECIFIC_CSS -->
+  <link rel="stylesheet" href="./simulation.css" />
 </head>
-<body class="bespoke">
-  <!-- Navigation Header -->
+<body class="bespoke simulation-app">
   <header class="header">
-    <h1 class="heading-small">APP NAME</h1>
-    <!-- APP_SPECIFIC_HEADER_CONTENT -->
+    <h1 class="heading-small">Graph Drive Simulator</h1>
     <div class="spacer"></div>
-    <button id="btn-help" class="button button-text">Help</button>
+    <span class="tag info">BFS vs DFS</span>
   </header>
 
-  <!-- Main Application Content -->
-  <!-- APP_SPECIFIC_MAIN_CONTENT -->
+  <main class="main-layout">
+    <aside class="sidebar simulation-sidebar">
+      <section class="box card non-interactive sidebar-card">
+        <h2 class="heading-xxxsmall">Run Controls</h2>
 
-  <!-- Core Scripts -->
-  <script type="module" src="./app.js"></script>
-  <!-- APP_SPECIFIC_SCRIPTS -->
+        <label for="algorithm-select" class="label-medium">Solver</label>
+        <select id="algorithm-select" class="input">
+          <option value="student">Student Solution</option>
+          <option value="bfs">Built-in BFS</option>
+          <option value="dfs">Built-in DFS</option>
+        </select>
+
+        <div class="row control-row">
+          <button id="run-btn" class="button button-primary">Run Solution</button>
+          <button id="reset-btn" class="button button-secondary">Reset</button>
+        </div>
+      </section>
+
+      <section class="box card non-interactive sidebar-card">
+        <h2 class="heading-xxxsmall">Score</h2>
+        <div class="score-grid">
+          <div><span class="label-small">Correctness</span><p id="score-correctness" class="body-medium strong">-</p></div>
+          <div><span class="label-small">Optimality</span><p id="score-optimality" class="body-medium strong">-</p></div>
+          <div><span class="label-small">Efficiency</span><p id="score-efficiency" class="body-medium strong">-</p></div>
+          <div><span class="label-small">Total</span><p id="score-total" class="body-medium strong">-</p></div>
+        </div>
+      </section>
+
+      <section class="box card non-interactive sidebar-card">
+        <h2 class="heading-xxxsmall">Run Details</h2>
+        <p id="status-text" class="body-small">Ready.</p>
+        <p id="path-text" class="code-small">Path: -</p>
+        <p id="visited-text" class="code-small">Visited: -</p>
+      </section>
+    </aside>
+
+    <section class="content-area simulation-content">
+      <div class="hud-row">
+        <span id="time-chip" class="tag secondary">Time: 0.0s</span>
+        <span class="tag">Drive the red car to the finish</span>
+      </div>
+      <canvas id="map-canvas" width="1280" height="860" aria-label="Map canvas"></canvas>
+    </section>
+  </main>
+
+  <script type="module" src="./simulation.js"></script>
 </body>
 </html>

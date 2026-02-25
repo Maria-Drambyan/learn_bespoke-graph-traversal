@@ -1,0 +1,73 @@
+.simulation-app {
+  background: var(--Colors-Backgrounds-Main-Light);
+}
+
+.simulation-sidebar {
+  padding: var(--UI-Spacing-spacing-ms);
+  display: flex;
+  flex-direction: column;
+  gap: var(--UI-Spacing-spacing-ms);
+}
+
+.sidebar-card {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: var(--UI-Spacing-spacing-ms);
+  padding: var(--UI-Spacing-spacing-ms);
+}
+
+.control-row {
+  margin-top: var(--UI-Spacing-spacing-s);
+}
+
+.score-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--UI-Spacing-spacing-ms);
+}
+
+.score-grid p {
+  margin: var(--UI-Spacing-spacing-xxs) 0 0;
+}
+
+.simulation-content {
+  position: relative;
+  padding: var(--UI-Spacing-spacing-ms);
+  overflow: hidden;
+}
+
+.hud-row {
+  position: absolute;
+  top: var(--UI-Spacing-spacing-ml);
+  left: var(--UI-Spacing-spacing-ml);
+  z-index: 2;
+  display: flex;
+  gap: var(--UI-Spacing-spacing-s);
+  flex-wrap: wrap;
+}
+
+#map-canvas {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--UI-Radius-radius-m);
+  border: 1.5px solid var(--Colors-Stroke-Default);
+  background: var(--Colors-Base-Accent-Green-200);
+  display: block;
+}
+
+#status-text,
+#path-text,
+#visited-text {
+  margin: 0;
+}
+
+@media (max-width: 980px) {
+  .simulation-sidebar {
+    order: 2;
+  }
+
+  .simulation-content {
+    min-height: 60vh;
+  }
+}
