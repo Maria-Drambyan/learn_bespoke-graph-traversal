@@ -5,7 +5,7 @@ const DIFFICULTY = {
     templates: ['cleanLane', 'cityGrid'],
     optionalCount: 0,
     trafficCount: 1,
-    laneJitter: 8,
+    laneJitter: 6,
     maxDiagonals: 0,
     maxDiagonalPerNode: 0,
     maxNodeDegree: 4,
@@ -18,7 +18,7 @@ const DIFFICULTY = {
     templates: ['cleanLane', 'cityGrid', 'zigzagSpine'],
     optionalCount: 1,
     trafficCount: 2,
-    laneJitter: 14,
+    laneJitter: 10,
     maxDiagonals: 1,
     maxDiagonalPerNode: 1,
     maxNodeDegree: 4,
@@ -31,7 +31,7 @@ const DIFFICULTY = {
     templates: ['cleanLane', 'cityGrid', 'zigzagSpine'],
     optionalCount: 2,
     trafficCount: 3,
-    laneJitter: 18,
+    laneJitter: 14,
     maxDiagonals: 2,
     maxDiagonalPerNode: 1,
     maxNodeDegree: 4,
@@ -59,7 +59,7 @@ const TEMPLATES = {
       { id: 'K', x: 630, y: 630 }
     ],
     edges: [
-      ['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'E'], ['E', 'F'],
+      ['A', 'B'], ['B', 'C'], ['D', 'E'], ['E', 'F'],
       ['B', 'G'], ['G', 'H'], ['H', 'C'],
       ['H', 'I'], ['I', 'D'],
       ['C', 'J'], ['J', 'K'], ['K', 'D']
@@ -99,7 +99,7 @@ const TEMPLATES = {
       { id: 'L', x: 720, y: 630 }
     ],
     edges: [
-      ['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'E'], ['E', 'F'],
+      ['A', 'B'], ['B', 'C'], ['D', 'E'], ['E', 'F'],
       ['B', 'G'], ['G', 'H'], ['H', 'I'], ['I', 'D'],
       ['B', 'J'], ['J', 'K'], ['K', 'L'], ['L', 'D'],
       ['C', 'H'], ['C', 'K']
@@ -139,7 +139,7 @@ const TEMPLATES = {
       { id: 'L', x: 890, y: 620 }
     ],
     edges: [
-      ['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'E'], ['E', 'F'],
+      ['A', 'B'], ['B', 'C'], ['D', 'E'], ['E', 'F'],
       ['B', 'G'], ['G', 'H'], ['H', 'C'],
       ['H', 'I'], ['I', 'D'],
       ['C', 'J'], ['J', 'K'], ['K', 'D'],
@@ -386,10 +386,77 @@ function hasReadableGeometry(graph, cfg) {
   return edgePairsPassLayoutRules(edgePairs, nodeMap, cfg);
 }
 
-function shiftScenery(items, maxDx = 16, maxDy = 12) {
-  const dx = randomInt(-maxDx, maxDx);
-  const dy = randomInt(-maxDy, maxDy);
-  return items.map((item) => ({ ...item, x: item.x + dx, y: item.y + dy }));
+function distancePointToSegment(px, py, ax, ay, bx, by) {
+  const abx = bx - ax;
+  const aby = by - ay;
+  const apx = px - ax;
+  const apy = py - ay;
+  const ab2 = abx * abx + aby * aby;
+  if (ab2 === 0) return Math.hypot(px - ax, py - ay);
+  const t = clamp((apx * abx + apy * aby) / ab2, 0, 1);
+  const cx = ax + abx * t;
+  const cy = ay + aby * t;
+  return Math.hypot(px - cx, py - cy);
+}
+
+function segmentIntersectsRect(ax, ay, bx, by, rect) {
+  const minX = rect.x;
+  const minY = rect.y;
+  const maxX = rect.x + rect.w;
+  const maxY = rect.y + rect.h;
+
+  const inside = (x, y) => x >= minX && x <= maxX && y >= minY && y <= maxY;
+  if (inside(ax, ay) || inside(bx, by)) return true;
+
+  const intersects = (x1, y1, x2, y2, x3, y3, x4, y4) => {
+    const ccw = (xa, ya, xb, yb, xc, yc) => (yc - ya) * (xb - xa) > (yb - ya) * (xc - xa);
+    return (
+      ccw(x1, y1, x3, y3, x4, y4) !== ccw(x2, y2, x3, y3, x4, y4) &&
+      ccw(x1, y1, x2, y2, x3, y3) !== ccw(x1, y1, x2, y2, x4, y4)
+    );
+  };
+
+  return (
+    intersects(ax, ay, bx, by, minX, minY, maxX, minY) ||
+    intersects(ax, ay, bx, by, maxX, minY, maxX, maxY) ||
+    intersects(ax, ay, bx, by, maxX, maxY, minX, maxY) ||
+    intersects(ax, ay, bx, by, minX, maxY, minX, minY)
+  );
+}
+
+function hasNoRoadSceneryCollision(graph, houses, trees) {
+  const ROAD_HALF_WIDTH = 48;
+  const HOUSE_MARGIN = 18;
+  const TREE_CLEARANCE = 42 + ROAD_HALF_WIDTH;
+  const nodeMap = buildNodeMap(graph.nodes);
+
+  const expandedHouses = houses.map((h) => ({
+    x: h.x - HOUSE_MARGIN,
+    y: h.y - HOUSE_MARGIN,
+    w: h.w + HOUSE_MARGIN * 2,
+    h: h.h + HOUSE_MARGIN * 2
+  }));
+
+  for (const edge of graph.edges) {
+    const from = nodeMap.get(edge.from);
+    const to = nodeMap.get(edge.to);
+    if (!from || !to) continue;
+
+    for (const house of expandedHouses) {
+      if (segmentIntersectsRect(from.x, from.y, to.x, to.y, house)) {
+        return false;
+      }
+    }
+
+    for (const tree of trees) {
+      const d = distancePointToSegment(tree.x, tree.y, from.x, from.y, to.x, to.y);
+      if (d < TREE_CLEARANCE) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 function validResult(result, startId, goalId) {
@@ -399,6 +466,45 @@ function validResult(result, startId, goalId) {
     result.path[0] === startId &&
     result.path[result.path.length - 1] === goalId
   );
+}
+
+function pathDifferenceScore(pathA = [], pathB = []) {
+  const maxLen = Math.max(pathA.length, pathB.length);
+  if (maxLen === 0) return 0;
+  let mismatches = Math.abs(pathA.length - pathB.length);
+  const common = Math.min(pathA.length, pathB.length);
+  for (let i = 0; i < common; i += 1) {
+    if (pathA[i] !== pathB[i]) mismatches += 1;
+  }
+  return mismatches;
+}
+
+function chooseBestDistractor(correctAlgorithm, graph, startId, goalId, targetResult) {
+  const candidates = Object.keys(ALGORITHMS).filter((name) => name !== correctAlgorithm);
+  let best = null;
+
+  for (const algo of candidates) {
+    const result = solveByAlgorithm(algo, graph, startId, goalId);
+    if (!validResult(result, startId, goalId)) {
+      continue;
+    }
+
+    const score = pathDifferenceScore(targetResult.path, result.path);
+    if (!best || score > best.score) {
+      best = { algorithm: algo, result, score };
+    }
+  }
+
+  if (best) {
+    return best;
+  }
+
+  const fallbackAlgo = randomDistractor(correctAlgorithm);
+  return {
+    algorithm: fallbackAlgo,
+    result: solveByAlgorithm(fallbackAlgo, graph, startId, goalId),
+    score: 0
+  };
 }
 
 function pickTraffic(graph, startId, goalId, correctPath, distractorPath, count) {
@@ -433,23 +539,32 @@ export function generateCityMap({ correctAlgorithm = 'bfs', difficulty = 'medium
   let distractorAlgorithm = null;
   let targetResult = null;
   let distractorResult = null;
+  let distractorScore = 0;
 
-  for (let attempt = 0; attempt < 40; attempt += 1) {
+  const houses = template.houses.map((house) => ({ ...house }));
+  const trees = template.trees.map((tree) => ({ ...tree }));
+
+  for (let attempt = 0; attempt < 80; attempt += 1) {
     graph = buildGraph(template, cfg);
     if (!isConnectedGraph(graph, template.startId)) continue;
     if (!hasReadableGeometry(graph, cfg)) continue;
     if (!hasOnlyExpectedDeadEnds(graph, template.startId, template.goalId)) continue;
+    if (!hasNoRoadSceneryCollision(graph, houses, trees)) continue;
 
     targetResult = solveByAlgorithm(validCorrect, graph, template.startId, template.goalId);
     if (!validResult(targetResult, template.startId, template.goalId)) continue;
 
-    distractorAlgorithm = randomDistractor(validCorrect);
-    distractorResult = solveByAlgorithm(
-      distractorAlgorithm,
+    const distractor = chooseBestDistractor(
+      validCorrect,
       graph,
       template.startId,
-      template.goalId
+      template.goalId,
+      targetResult
     );
+    distractorAlgorithm = distractor.algorithm;
+    distractorResult = distractor.result;
+    distractorScore = distractor.score;
+    if (distractorScore < 1) continue;
     break;
   }
 
@@ -462,14 +577,17 @@ export function generateCityMap({ correctAlgorithm = 'bfs', difficulty = 'medium
         cost: randomInt(cfg.mainMin, cfg.altMax)
       }))
     };
-    distractorAlgorithm = randomDistractor(validCorrect);
     targetResult = solveByAlgorithm(validCorrect, graph, template.startId, template.goalId);
-    distractorResult = solveByAlgorithm(
-      distractorAlgorithm,
+    const distractor = chooseBestDistractor(
+      validCorrect,
       graph,
       template.startId,
-      template.goalId
+      template.goalId,
+      targetResult
     );
+    distractorAlgorithm = distractor.algorithm;
+    distractorResult = distractor.result;
+    distractorScore = distractor.score;
   }
 
   const trafficCars = pickTraffic(
@@ -487,13 +605,14 @@ export function generateCityMap({ correctAlgorithm = 'bfs', difficulty = 'medium
     goalId: template.goalId,
     obstacles: [],
     trafficCars,
-    houses: shiftScenery(template.houses, 12, 8),
-    trees: shiftScenery(template.trees, 16, 12),
+    houses,
+    trees,
     meta: {
       correctAlgorithm: validCorrect,
       distractorAlgorithm,
       difficulty: validDifficulty,
       template: template.name,
+      distractorPathScore: distractorScore,
       generated: true
     }
   };
