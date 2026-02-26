@@ -29,9 +29,14 @@ export class MapVisualizer {
     this.ctx = this.canvas.getContext('2d');
     this.scene = null;
     this.nodeById = new Map();
+    this.playerSprite = null;
+    this.playerSpriteReady = false;
+    this.playerSpriteFailed = false;
 
     this.animationSpeed = 0.02;
     this._animationFrame = null;
+
+    this.loadPlayerSprite();
   }
 
   setScene(scene) {
@@ -51,6 +56,33 @@ export class MapVisualizer {
       cancelAnimationFrame(this._animationFrame);
       this._animationFrame = null;
     }
+  }
+
+  loadPlayerSprite() {
+    const candidates = [
+      '/neutral-cosmo-2.png',
+      '/assets/neutral-cosmo-2.png',
+      './assets/neutral-cosmo-2.png'
+    ];
+
+    const tryLoad = (index) => {
+      if (index >= candidates.length) {
+        this.playerSpriteFailed = true;
+        return;
+      }
+
+      const img = new Image();
+      img.onload = () => {
+        this.playerSprite = img;
+        this.playerSpriteReady = true;
+      };
+      img.onerror = () => {
+        tryLoad(index + 1);
+      };
+      img.src = `${candidates[index]}?v=1`;
+    };
+
+    tryLoad(0);
   }
 
   draw({
@@ -410,11 +442,38 @@ export class MapVisualizer {
 
     const player = carPoint ?? (carNodeId ? this.nodeById.get(carNodeId) : null);
     if (player) {
-      this.drawCar(player.x, player.y, danger, 0, carAngle);
+      if (this.playerSpriteReady && this.playerSprite) {
+        this.drawPlayerSprite(player.x, player.y, 0, carAngle);
+      } else {
+        this.drawCar(player.x, player.y, danger, 0, carAngle);
+      }
       if (crashed) {
         this.drawCrashEffect(crashEffect ?? { x: player.x, y: player.y - 28 });
       }
     }
+  }
+
+  drawPlayerSprite(x, y, shakeLevel, angle = 0) {
+    const ctx = this.ctx;
+    if (!this.playerSprite) {
+      return;
+    }
+
+    const jitterX = shakeLevel > 0 ? (Math.random() - 0.5) * shakeLevel * 1.4 : 0;
+    const jitterY = shakeLevel > 0 ? (Math.random() - 0.5) * shakeLevel * 1.4 : 0;
+
+    // Draw exact sprite shape (no rotation, no stretching), scaled uniformly.
+    const maxSize = 56;
+    const srcW = this.playerSprite.naturalWidth || this.playerSprite.width || maxSize;
+    const srcH = this.playerSprite.naturalHeight || this.playerSprite.height || maxSize;
+    const scale = Math.min(maxSize / srcW, maxSize / srcH);
+    const drawW = srcW * scale;
+    const drawH = srcH * scale;
+
+    ctx.save();
+    ctx.translate(x + jitterX, y + jitterY);
+    ctx.drawImage(this.playerSprite, -drawW / 2, -drawH / 2, drawW, drawH);
+    ctx.restore();
   }
 
   drawCar(x, y, color, shakeLevel, angle = 0) {
