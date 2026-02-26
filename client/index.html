@@ -29,19 +29,19 @@
 
   <main class="main-layout">
     <aside class="sidebar simulation-sidebar">
-      <section class="box card non-interactive sidebar-card">
+      <section class="box card non-interactive sidebar-card run-controls-card">
         <h2 class="heading-xxxsmall">Run Controls</h2>
 
         <span class="label-medium">Solver</span>
         <div id="algorithm-options" class="algorithm-options" role="radiogroup" aria-label="Solver options"></div>
 
         <div class="row control-row">
-          <button id="run-btn" class="button button-primary">Run Solution</button>
-          <button id="reset-btn" class="button button-secondary">Reset</button>
+          <button id="run-btn" class="button button-primary button-small">Run Solution</button>
+          <button id="reset-btn" class="button button-secondary button-small">Reset</button>
         </div>
       </section>
 
-      <section class="box card non-interactive sidebar-card">
+      <section class="box card non-interactive sidebar-card score-card">
         <h2 class="heading-xxxsmall">Score</h2>
         <div class="score-grid">
           <div><span class="label-small">Correctness</span><p id="score-correctness" class="body-medium strong">-</p></div>
@@ -51,7 +51,7 @@
         </div>
       </section>
 
-      <section class="box card non-interactive sidebar-card">
+      <section class="box card non-interactive sidebar-card run-details-card">
         <h2 class="heading-xxxsmall">Run Details</h2>
         <p id="status-text" class="body-small">Ready.</p>
         <p id="path-text" class="code-small">Path: -</p>
