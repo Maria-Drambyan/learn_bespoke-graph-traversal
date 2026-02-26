@@ -7,6 +7,13 @@ function lerp(a, b, t) {
   return a + (b - a) * t;
 }
 
+function angleFromPoints(from, to) {
+  if (!from || !to) {
+    return 0;
+  }
+  return Math.atan2(to.y - from.y, to.x - from.x);
+}
+
 export class MapVisualizer {
   constructor(canvasId) {
     this.canvas = document.getElementById(canvasId);
@@ -42,6 +49,7 @@ export class MapVisualizer {
     path = [],
     carNodeId = null,
     carPoint = null,
+    carAngle = 0,
     crashed = false,
     crashEffect = null
   }) {
@@ -70,6 +78,9 @@ export class MapVisualizer {
     const visitedColor = getToken('--Colors-Primary-Lightest', '#D2E2FF');
     const danger = getToken('--Colors-Alert-Error-Default', '#C6093A');
     const otherCar = getToken('--Colors-Base-Accent-Yellow-500', '#FFB600');
+    const weightBg = getToken('--Colors-Base-Neutral-1300', '#1D2740');
+    const weightStroke = getToken('--Colors-Base-Neutral-00', '#FFFFFF');
+    const weightText = getToken('--Colors-Base-Neutral-00', '#FFFFFF');
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -209,6 +220,58 @@ export class MapVisualizer {
     }
     ctx.setLineDash([]);
 
+    // Draw edge weights slightly offset from lane center to keep labels readable.
+    for (const edge of this.scene.graph.edges) {
+      const from = this.nodeById.get(edge.from);
+      const to = this.nodeById.get(edge.to);
+      if (!from || !to) {
+        continue;
+      }
+      if (edge.from === this.scene.goalId || edge.to === this.scene.goalId) {
+        continue;
+      }
+      const cost = edge.cost ?? 1;
+      const midX = (from.x + to.x) / 2;
+      const midY = (from.y + to.y) / 2;
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const length = Math.hypot(dx, dy) || 1;
+      const offset = 34;
+      const labelX = midX - (dy / length) * offset;
+      const labelY = midY + (dx / length) * offset;
+      const text = String(cost);
+
+      ctx.font = '700 18px "Work Sans", sans-serif';
+      const textWidth = ctx.measureText(text).width;
+      const padX = 12;
+      const padY = 7;
+      const boxW = textWidth + padX * 2;
+      const boxH = 30;
+
+      ctx.save();
+      ctx.shadowColor = getToken('--Colors-Base-Neutral-Alphas-1300-50', 'rgba(30, 41, 67, .5)');
+      ctx.shadowBlur = 6;
+      ctx.shadowOffsetY = 2;
+      ctx.fillStyle = weightBg;
+      ctx.globalAlpha = 0.96;
+      ctx.beginPath();
+      ctx.roundRect(labelX - boxW / 2, labelY - boxH / 2, boxW, boxH, 10);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+
+      ctx.strokeStyle = weightStroke;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.roundRect(labelX - boxW / 2, labelY - boxH / 2, boxW, boxH, 10);
+      ctx.stroke();
+
+      ctx.fillStyle = weightText;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, labelX, labelY + 1);
+    }
+
     for (const nodeId of visitedNodes) {
       const node = this.nodeById.get(nodeId);
       if (!node) {
@@ -266,7 +329,7 @@ export class MapVisualizer {
       if (!n) {
         continue;
       }
-      this.drawCar(n.x, n.y, otherCar, 0);
+      this.drawCar(n.x, n.y, otherCar, 0, 0);
     }
 
     for (const obstacleId of this.scene.obstacles) {
@@ -279,20 +342,21 @@ export class MapVisualizer {
 
     const player = carPoint ?? (carNodeId ? this.nodeById.get(carNodeId) : null);
     if (player) {
-      this.drawCar(player.x, player.y, danger, 0);
+      this.drawCar(player.x, player.y, danger, 0, carAngle);
       if (crashed) {
         this.drawCrashEffect(crashEffect ?? { x: player.x, y: player.y - 28 });
       }
     }
   }
 
-  drawCar(x, y, color, shakeLevel) {
+  drawCar(x, y, color, shakeLevel, angle = 0) {
     const ctx = this.ctx;
     const jitterX = shakeLevel > 0 ? (Math.random() - 0.5) * shakeLevel * 1.4 : 0;
     const jitterY = shakeLevel > 0 ? (Math.random() - 0.5) * shakeLevel * 1.4 : 0;
 
     ctx.save();
     ctx.translate(x + jitterX, y + jitterY);
+    ctx.rotate(angle);
 
     ctx.fillStyle = color;
     ctx.fillRect(-30, -18, 60, 36);
@@ -401,6 +465,7 @@ export class MapVisualizer {
             const crashTarget = this.nodeById.get(arrivedNodeId);
             const previousNode = points[Math.max(0, segmentIndex - 1)];
             let crashPoint = crashTarget;
+            const crashAngle = angleFromPoints(previousNode, crashTarget);
 
             if (previousNode && crashTarget) {
               const dx = crashTarget.x - previousNode.x;
@@ -424,6 +489,7 @@ export class MapVisualizer {
               path,
               carNodeId: null,
               carPoint: crashPoint ?? points[Math.min(segmentIndex, points.length - 1)],
+              carAngle: crashAngle,
               crashed: true,
               crashEffect: effectPoint
             });
@@ -447,12 +513,16 @@ export class MapVisualizer {
               x: lerp(from.x, to.x, t),
               y: lerp(from.y, to.y, t)
             };
+        const carAngle = done
+          ? angleFromPoints(points[points.length - 2], points[points.length - 1])
+          : angleFromPoints(from, to);
 
         this.draw({
           visitedNodes,
           path,
           carNodeId: null,
           carPoint,
+          carAngle,
           crashed: false
         });
 
