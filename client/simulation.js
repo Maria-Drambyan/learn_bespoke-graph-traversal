@@ -1,6 +1,5 @@
 import { MapVisualizer } from './map-visualizer.js';
 import { generateCityMap } from './test-cases.js';
-import studentSolutionFallback from './student-solution.js?raw';
 import {
   calculateScore,
   computePathCost,
@@ -137,7 +136,7 @@ async function runStudent(graph, startId, goalId) {
   }
 
   if (!rawSource) {
-    rawSource = studentSolutionFallback;
+    throw new Error('Could not load /student-solution.js');
   }
   const normalizedSource = rawSource
     .replace(/export\s+function\s+solvePath/g, 'function solvePath')
