@@ -26,7 +26,7 @@
   <header class="header">
     <h1 class="heading-small">Graph Drive Simulator</h1>
     <div class="spacer"></div>
-    <span class="tag info">BFS vs DFS</span>
+    <span id="scenario-chip" class="tag info">Scenario: -</span>
   </header>
 
   <main class="main-layout">
@@ -35,14 +35,27 @@
         <h2 class="heading-xxxsmall">Run Controls</h2>
 
         <label for="algorithm-select" class="label-medium">Solver</label>
-        <select id="algorithm-select" class="input">
-          <option value="student">Student Solution</option>
-          <option value="bfs">Built-in BFS</option>
-          <option value="dfs">Built-in DFS</option>
+        <select id="algorithm-select" class="input"></select>
+
+        <label for="correct-algo-select" class="label-medium">Correct Algorithm Input</label>
+        <select id="correct-algo-select" class="input">
+          <option value="bfs">BFS</option>
+          <option value="dfs">DFS</option>
+          <option value="dijkstra">Dijkstra</option>
+          <option value="astar">A*</option>
+          <option value="bellmanFord">Bellman-Ford</option>
+        </select>
+
+        <label for="difficulty-select" class="label-medium">Difficulty Input</label>
+        <select id="difficulty-select" class="input">
+          <option value="easy">Easy</option>
+          <option value="medium" selected>Medium</option>
+          <option value="hard">Hard</option>
         </select>
 
         <div class="row control-row">
           <button id="run-btn" class="button button-primary">Run Solution</button>
+          <button id="generate-btn" class="button button-tertiary">Generate Map</button>
           <button id="reset-btn" class="button button-secondary">Reset</button>
         </div>
       </section>
@@ -70,7 +83,7 @@
         <span id="time-chip" class="tag secondary">Time: 0.0s</span>
         <span class="tag">Drive the red car to the finish</span>
       </div>
-      <canvas id="map-canvas" width="1280" height="860" aria-label="Map canvas"></canvas>
+      <canvas id="map-canvas" width="1200" height="800" aria-label="Map canvas"></canvas>
     </section>
   </main>
 

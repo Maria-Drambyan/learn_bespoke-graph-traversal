@@ -87,10 +87,16 @@ export class MapVisualizer {
     ctx.fillStyle = grass;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    const topBandY = Math.floor(canvas.height * 0.13);
+    const bottomBandY = Math.floor(canvas.height * 0.88);
+    const leftBandW = Math.floor(canvas.width * 0.38);
+    const rightBandX = Math.floor(canvas.width * 0.44);
+    const rightBandW = Math.floor(canvas.width * 0.47);
+
     ctx.fillStyle = grassDark;
-    ctx.fillRect(70, 110, 460, 72);
-    ctx.fillRect(550, 110, 660, 72);
-    ctx.fillRect(70, 820, canvas.width - 140, 60);
+    ctx.fillRect(70, topBandY, leftBandW, 64);
+    ctx.fillRect(rightBandX, topBandY, rightBandW, 64);
+    ctx.fillRect(70, bottomBandY, canvas.width - 140, 48);
 
     for (const house of this.scene.houses) {
       ctx.save();
@@ -174,7 +180,7 @@ export class MapVisualizer {
 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.lineWidth = 120;
+    ctx.lineWidth = 96;
     ctx.strokeStyle = road;
 
     for (const edge of this.scene.graph.edges) {
@@ -220,7 +226,8 @@ export class MapVisualizer {
     }
     ctx.setLineDash([]);
 
-    // Draw edge weights slightly offset from lane center to keep labels readable.
+    // Draw edge weights directly on their segment with overlap handling.
+    const occupiedWeightSpots = [];
     for (const edge of this.scene.graph.edges) {
       const from = this.nodeById.get(edge.from);
       const to = this.nodeById.get(edge.to);
@@ -231,14 +238,15 @@ export class MapVisualizer {
         continue;
       }
       const cost = edge.cost ?? 1;
-      const midX = (from.x + to.x) / 2;
-      const midY = (from.y + to.y) / 2;
+      const anchorT = 0.5;
+      const midX = lerp(from.x, to.x, anchorT);
+      const midY = lerp(from.y, to.y, anchorT);
       const dx = to.x - from.x;
       const dy = to.y - from.y;
       const length = Math.hypot(dx, dy) || 1;
-      const offset = 34;
-      const labelX = midX - (dy / length) * offset;
-      const labelY = midY + (dx / length) * offset;
+      const offset = 30;
+      let labelX = midX - (dy / length) * offset;
+      let labelY = midY + (dx / length) * offset;
       const text = String(cost);
 
       ctx.font = '700 18px "Work Sans", sans-serif';
@@ -247,6 +255,39 @@ export class MapVisualizer {
       const padY = 7;
       const boxW = textWidth + padX * 2;
       const boxH = 30;
+
+      // If a new label overlaps an older label, push it farther from the road.
+      let guard = 0;
+      let overlaps = false;
+      while (guard < 6) {
+        overlaps = occupiedWeightSpots.some((spot) => (
+          Math.abs(labelX - spot.x) < (boxW / 2 + spot.w / 2 + 8) &&
+          Math.abs(labelY - spot.y) < (boxH / 2 + spot.h / 2 + 8)
+        ));
+        if (!overlaps) break;
+        labelX -= (dy / length) * 14;
+        labelY += (dx / length) * 14;
+        guard += 1;
+      }
+
+      overlaps = occupiedWeightSpots.some((spot) => (
+        Math.abs(labelX - spot.x) < (boxW / 2 + spot.w / 2 + 8) &&
+        Math.abs(labelY - spot.y) < (boxH / 2 + spot.h / 2 + 8)
+      ));
+      if (overlaps) {
+        continue;
+      }
+
+      occupiedWeightSpots.push({ x: labelX, y: labelY, w: boxW, h: boxH });
+
+      ctx.strokeStyle = weightStroke;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.75;
+      ctx.beginPath();
+      ctx.moveTo(midX, midY);
+      ctx.lineTo(labelX, labelY);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
 
       ctx.save();
       ctx.shadowColor = getToken('--Colors-Base-Neutral-Alphas-1300-50', 'rgba(30, 41, 67, .5)');
@@ -313,15 +354,7 @@ export class MapVisualizer {
     }
 
     if (goalNode) {
-      ctx.fillStyle = lane;
-      ctx.fillRect(goalNode.x - 52, goalNode.y - 52, 104, 52);
-      const cell = 13;
-      for (let row = 0; row < 4; row += 1) {
-        for (let col = 0; col < 8; col += 1) {
-          ctx.fillStyle = (row + col) % 2 === 0 ? getToken('--Colors-Base-Neutral-1300', '#1D2740') : lane;
-          ctx.fillRect(goalNode.x - 52 + col * cell, goalNode.y - 52 + row * cell, cell, cell);
-        }
-      }
+      this.drawFinishBand(goalNode);
     }
 
     for (const trafficNodeId of this.scene.trafficCars) {
@@ -422,6 +455,53 @@ export class MapVisualizer {
     ctx.quadraticCurveTo(x - 1, y + 8, x - 2, y + 4);
     ctx.quadraticCurveTo(x - 5, y - 3, x, y - 11);
     ctx.fill();
+    ctx.restore();
+  }
+
+  drawFinishBand(goalNode) {
+    const ctx = this.ctx;
+    const lane = getToken('--Colors-Base-Neutral-00', '#FFFFFF');
+    const dark = getToken('--Colors-Base-Neutral-1300', '#1D2740');
+
+    const incomingEdge = this.scene.graph.edges.find((edge) => {
+      if (edge.blocked) return false;
+      return edge.from === this.scene.goalId || edge.to === this.scene.goalId;
+    });
+
+    const incomingNodeId = incomingEdge
+      ? (incomingEdge.from === this.scene.goalId ? incomingEdge.to : incomingEdge.from)
+      : null;
+    const incomingNode = incomingNodeId ? this.nodeById.get(incomingNodeId) : null;
+    const angle = incomingNode ? angleFromPoints(incomingNode, goalNode) : 0;
+
+    const bandThickness = 26;
+    const roadWidth = 100;
+    const rows = 8;
+    const cols = 2;
+    const cellH = roadWidth / rows;
+    const cellW = bandThickness / cols;
+
+    ctx.save();
+    ctx.translate(goalNode.x, goalNode.y);
+    ctx.rotate(angle);
+
+    ctx.fillStyle = lane;
+    ctx.beginPath();
+    ctx.roundRect(-bandThickness / 2 - 2, -roadWidth / 2 - 2, bandThickness + 4, roadWidth + 4, 4);
+    ctx.fill();
+
+    for (let r = 0; r < rows; r += 1) {
+      for (let c = 0; c < cols; c += 1) {
+        ctx.fillStyle = (r + c) % 2 === 0 ? dark : lane;
+        ctx.fillRect(
+          -bandThickness / 2 + c * cellW,
+          -roadWidth / 2 + r * cellH,
+          cellW,
+          cellH
+        );
+      }
+    }
+
     ctx.restore();
   }
 

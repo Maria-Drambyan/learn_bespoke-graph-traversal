@@ -1,129 +1,14 @@
 import { MapVisualizer } from './map-visualizer.js';
 import { generateCityMap } from './test-cases.js';
+import { solveByAlgorithm } from './algorithms.js';
 import {
   calculateScore,
-  checkCorrectness,
   computePathCost,
   findOptimalSolution
 } from './score-calculator.js';
 
-function makeAdjacency(graph) {
-  const adj = new Map();
-  for (const node of graph.nodes) {
-    adj.set(node.id, []);
-  }
-
-  for (const edge of graph.edges) {
-    if (edge.blocked) {
-      continue;
-    }
-
-    adj.get(edge.from)?.push(edge.to);
-    adj.get(edge.to)?.push(edge.from);
-  }
-
-  return adj;
-}
-
-function runBFS(graph, startId, goalId) {
-  const nodeIds = graph.nodes.map((node) => node.id);
-  const indexById = new Map(nodeIds.map((id, index) => [id, index]));
-  const adj = new Array(nodeIds.length).fill(null).map(() => []);
-
-  for (const edge of graph.edges) {
-    if (edge.blocked) {
-      continue;
-    }
-
-    const fromIndex = indexById.get(edge.from);
-    const toIndex = indexById.get(edge.to);
-    if (fromIndex == null || toIndex == null) {
-      continue;
-    }
-
-    // Undirected road graph.
-    adj[fromIndex].push(toIndex);
-    adj[toIndex].push(fromIndex);
-  }
-
-  const startIndex = indexById.get(startId);
-  const goalIndex = indexById.get(goalId);
-  if (startIndex == null || goalIndex == null) {
-    return { path: [startId], visitedNodes: [], stepsCount: 0 };
-  }
-
-  const visited = new Array(nodeIds.length).fill(false);
-  const parent = new Array(nodeIds.length).fill(-1);
-  const queue = [];
-  const visitedNodes = [];
-
-  visited[startIndex] = true;
-  queue.push(startIndex);
-
-  while (queue.length !== 0) {
-    const currentIndex = queue.shift();
-    visitedNodes.push(nodeIds[currentIndex]);
-
-    if (currentIndex === goalIndex) {
-      break;
-    }
-
-    for (const nextIndex of adj[currentIndex]) {
-      if (!visited[nextIndex]) {
-        visited[nextIndex] = true;
-        parent[nextIndex] = currentIndex;
-        queue.push(nextIndex);
-      }
-    }
-  }
-
-  if (!visited[goalIndex]) {
-    return { path: [startId], visitedNodes, stepsCount: visitedNodes.length };
-  }
-
-  const path = [];
-  let cursor = goalIndex;
-  while (cursor !== -1) {
-    path.unshift(nodeIds[cursor]);
-    cursor = parent[cursor];
-  }
-
-  return { path, visitedNodes, stepsCount: visitedNodes.length };
-}
-
-function runDFS(graph, startId, goalId) {
-  const adj = makeAdjacency(graph);
-  const stack = [[startId]];
-  const seen = new Set();
-  const visitedNodes = [];
-
-  while (stack.length > 0) {
-    const path = stack.pop();
-    const node = path[path.length - 1];
-
-    if (seen.has(node)) {
-      continue;
-    }
-
-    seen.add(node);
-    visitedNodes.push(node);
-
-    if (node === goalId) {
-      return { path, visitedNodes, stepsCount: visitedNodes.length };
-    }
-
-    // Keep insertion order so DFS dives into branch-heavy roads first on this map.
-    // This makes BFS and DFS visibly different for teaching purposes.
-    const neighbors = adj.get(node) ?? [];
-    for (const next of neighbors) {
-      if (!seen.has(next)) {
-        stack.push([...path, next]);
-      }
-    }
-  }
-
-  return { path: [startId], visitedNodes, stepsCount: visitedNodes.length };
-}
+const KNOWN_ALGOS = ['bfs', 'dfs', 'dijkstra', 'astar', 'bellmanFord'];
+const KNOWN_DIFFICULTIES = ['easy', 'medium', 'hard'];
 
 async function runStudent(graph, startId, goalId) {
   const response = await fetch('./student-solution.js');
@@ -229,10 +114,7 @@ function setHud(timeSec) {
 
 function edgeExists(graph, from, to) {
   return graph.edges.some((edge) => {
-    if (edge.blocked) {
-      return false;
-    }
-
+    if (edge.blocked) return false;
     return (
       (edge.from === from && edge.to === to) ||
       (edge.from === to && edge.to === from)
@@ -286,14 +168,74 @@ function buildAnimationAttempt(graph, path, startId, goalId) {
   return { animPath, reachedGoal, issue };
 }
 
+function sanitizeInput(correctAlgorithm, difficulty) {
+  const validCorrect = KNOWN_ALGOS.includes(correctAlgorithm) ? correctAlgorithm : 'bfs';
+  const validDifficulty = KNOWN_DIFFICULTIES.includes(difficulty) ? difficulty : 'medium';
+  return { validCorrect, validDifficulty };
+}
+
+function getInputDefaultsFromEnv() {
+  const correctAlgorithm = import.meta.env.VITE_CORRECT_ALGO || 'bfs';
+  const difficulty = import.meta.env.VITE_DIFFICULTY || 'medium';
+  return sanitizeInput(String(correctAlgorithm), String(difficulty));
+}
+
+function updateScenarioChip(scene) {
+  const chip = document.getElementById('scenario-chip');
+  if (!chip || !scene?.meta) return;
+  const m = scene.meta;
+  chip.textContent = `Target: ${m.correctAlgorithm} | Distractor: ${m.distractorAlgorithm} | ${m.difficulty}`;
+}
+
+function prettifyAlgo(name) {
+  const labels = {
+    bfs: 'BFS',
+    dfs: 'DFS',
+    dijkstra: 'Dijkstra',
+    astar: 'A*',
+    bellmanFord: 'Bellman-Ford'
+  };
+  return labels[name] || name;
+}
+
+function setupSolverChoices(selectEl, scene) {
+  const target = scene.meta.correctAlgorithm;
+  const distractor = scene.meta.distractorAlgorithm;
+
+  selectEl.innerHTML = '';
+  const targetOption = document.createElement('option');
+  targetOption.value = target;
+  targetOption.textContent = `Correct Candidate (${prettifyAlgo(target)})`;
+
+  const distractorOption = document.createElement('option');
+  distractorOption.value = distractor;
+  distractorOption.textContent = `Distractor Candidate (${prettifyAlgo(distractor)})`;
+
+  selectEl.appendChild(targetOption);
+  selectEl.appendChild(distractorOption);
+}
+
 async function initializeSimulation() {
-  const scene = generateCityMap();
   const visualizer = new MapVisualizer('map-canvas');
-  visualizer.setScene(scene);
 
   const runButton = document.getElementById('run-btn');
   const resetButton = document.getElementById('reset-btn');
+  const generateButton = document.getElementById('generate-btn');
   const solverSelect = document.getElementById('algorithm-select');
+  const correctSelect = document.getElementById('correct-algo-select');
+  const difficultySelect = document.getElementById('difficulty-select');
+
+  const defaults = getInputDefaultsFromEnv();
+  correctSelect.value = defaults.validCorrect;
+  difficultySelect.value = defaults.validDifficulty;
+
+  let scene = generateCityMap({
+    correctAlgorithm: defaults.validCorrect,
+    difficulty: defaults.validDifficulty
+  });
+  visualizer.setScene(scene);
+  setupSolverChoices(solverSelect, scene);
+  updateScenarioChip(scene);
 
   let running = false;
 
@@ -315,7 +257,7 @@ async function initializeSimulation() {
     });
 
     updateRunUI({
-      status: 'Ready. Choose a solver and run.',
+      status: `Ready. Target is ${scene.meta.correctAlgorithm} on ${scene.meta.difficulty}.`,
       path: [],
       visited: []
     });
@@ -323,16 +265,27 @@ async function initializeSimulation() {
     setHud(0);
   };
 
+  const regenerate = () => {
+    const input = sanitizeInput(correctSelect.value, difficultySelect.value);
+    scene = generateCityMap({
+      correctAlgorithm: input.validCorrect,
+      difficulty: input.validDifficulty
+    });
+    visualizer.setScene(scene);
+    setupSolverChoices(solverSelect, scene);
+    updateScenarioChip(scene);
+    reset();
+  };
+
   reset();
 
   runButton.addEventListener('click', async () => {
-    if (running) {
-      return;
-    }
+    if (running) return;
 
     running = true;
     runButton.disabled = true;
     resetButton.disabled = true;
+    generateButton.disabled = true;
 
     try {
       const selected = solverSelect.value;
@@ -340,16 +293,13 @@ async function initializeSimulation() {
 
       if (selected === 'student') {
         studentSolution = await runStudent(scene.graph, scene.startId, scene.goalId);
-      } else if (selected === 'bfs') {
-        studentSolution = runBFS(scene.graph, scene.startId, scene.goalId);
       } else {
-        studentSolution = runDFS(scene.graph, scene.startId, scene.goalId);
+        studentSolution = solveByAlgorithm(selected, scene.graph, scene.startId, scene.goalId);
       }
 
       const path = studentSolution.path ?? [];
       const visitedNodes = studentSolution.visitedNodes ?? [];
       const attempt = buildAnimationAttempt(scene.graph, path, scene.startId, scene.goalId);
-
       const optimalSolution = findOptimalSolution(scene.graph, scene.startId, scene.goalId);
 
       const score = calculateScore({
@@ -389,12 +339,7 @@ async function initializeSimulation() {
 
       const studentCost = computePathCost(scene.graph, path);
       if (animationResult.crashed) {
-        updateScoreUI({
-          correctnessScore: 0,
-          optimalityScore: 0,
-          efficiencyScore: 0,
-          totalScore: 0
-        });
+        updateScoreUI({ correctnessScore: 0, optimalityScore: 0, efficiencyScore: 0, totalScore: 0 });
       }
 
       let finalStatus = '';
@@ -422,10 +367,12 @@ async function initializeSimulation() {
       running = false;
       runButton.disabled = false;
       resetButton.disabled = false;
+      generateButton.disabled = false;
     }
   });
 
   resetButton.addEventListener('click', reset);
+  generateButton.addEventListener('click', regenerate);
 }
 
 if (document.readyState === 'loading') {

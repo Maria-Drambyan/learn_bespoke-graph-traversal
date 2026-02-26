@@ -2,11 +2,17 @@
   background: var(--Colors-Backgrounds-Main-Light);
 }
 
+.simulation-app .main-layout {
+  grid-template-columns: minmax(290px, 340px) 1fr;
+  min-height: calc(100vh - 58px);
+}
+
 .simulation-sidebar {
   padding: var(--UI-Spacing-spacing-ms);
   display: flex;
   flex-direction: column;
   gap: var(--UI-Spacing-spacing-ms);
+  overflow: auto;
 }
 
 .sidebar-card {
@@ -18,13 +24,14 @@
 }
 
 .control-row {
-  margin-top: var(--UI-Spacing-spacing-s);
+  margin-top: var(--UI-Spacing-spacing-xs);
+  flex-wrap: wrap;
 }
 
 .score-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--UI-Spacing-spacing-ms);
+  gap: var(--UI-Spacing-spacing-mxs);
 }
 
 .score-grid p {
@@ -34,22 +41,29 @@
 .simulation-content {
   position: relative;
   padding: var(--UI-Spacing-spacing-ms);
-  overflow: hidden;
+  overflow: auto;
 }
 
 .hud-row {
   position: absolute;
   top: var(--UI-Spacing-spacing-ml);
   left: var(--UI-Spacing-spacing-ml);
+  right: var(--UI-Spacing-spacing-ml);
   z-index: 2;
   display: flex;
   gap: var(--UI-Spacing-spacing-s);
   flex-wrap: wrap;
+  pointer-events: none;
+}
+
+.hud-row .tag {
+  pointer-events: auto;
 }
 
 #map-canvas {
   width: 100%;
-  height: 100%;
+  height: auto;
+  aspect-ratio: 6 / 4;
   border-radius: var(--UI-Radius-radius-m);
   border: 1.5px solid var(--Colors-Stroke-Default);
   background: var(--Colors-Base-Accent-Green-200);
@@ -62,12 +76,42 @@
   margin: 0;
 }
 
-@media (max-width: 980px) {
+@media (max-width: 1200px) {
+  .simulation-app .main-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    min-height: auto;
+  }
+
   .simulation-sidebar {
-    order: 2;
+    order: 1;
+    border-bottom: 1px solid var(--Colors-Stroke-Default);
   }
 
   .simulation-content {
-    min-height: 60vh;
+    order: 2;
+    min-height: 430px;
+  }
+}
+
+@media (max-width: 680px) {
+  .simulation-sidebar,
+  .simulation-content {
+    padding: var(--UI-Spacing-spacing-s);
+  }
+
+  .sidebar-card {
+    padding: var(--UI-Spacing-spacing-s);
+    gap: var(--UI-Spacing-spacing-s);
+  }
+
+  .control-row .button {
+    width: 100%;
+  }
+
+  .hud-row {
+    top: var(--UI-Spacing-spacing-s);
+    left: var(--UI-Spacing-spacing-s);
+    right: var(--UI-Spacing-spacing-s);
   }
 }
