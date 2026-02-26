@@ -40,23 +40,6 @@
           <button id="reset-btn" class="button button-secondary button-small">Reset</button>
         </div>
       </section>
-
-      <section class="box card non-interactive sidebar-card score-card">
-        <h2 class="heading-xxxsmall">Score</h2>
-        <div class="score-grid">
-          <div><span class="label-small">Correctness</span><p id="score-correctness" class="body-medium strong">-</p></div>
-          <div><span class="label-small">Optimality</span><p id="score-optimality" class="body-medium strong">-</p></div>
-          <div><span class="label-small">Efficiency</span><p id="score-efficiency" class="body-medium strong">-</p></div>
-          <div><span class="label-small">Total</span><p id="score-total" class="body-medium strong">-</p></div>
-        </div>
-      </section>
-
-      <section class="box card non-interactive sidebar-card run-details-card">
-        <h2 class="heading-xxxsmall">Run Details</h2>
-        <p id="status-text" class="body-small">Ready.</p>
-        <p id="path-text" class="code-small">Path: -</p>
-        <p id="visited-text" class="code-small">Visited: -</p>
-      </section>
     </aside>
 
     <section class="content-area simulation-content">
@@ -65,6 +48,25 @@
         <span class="tag">Drive the red car to the finish</span>
       </div>
       <canvas id="map-canvas" width="1200" height="800" aria-label="Map canvas"></canvas>
+
+      <div class="simulation-results">
+        <section class="box card non-interactive sidebar-card score-card">
+          <h2 class="heading-xxxsmall">Score</h2>
+          <div class="score-grid">
+            <div><span class="label-small">Correctness</span><p id="score-correctness" class="body-medium strong">-</p></div>
+            <div><span class="label-small">Optimality</span><p id="score-optimality" class="body-medium strong">-</p></div>
+            <div><span class="label-small">Efficiency</span><p id="score-efficiency" class="body-medium strong">-</p></div>
+            <div><span class="label-small">Total</span><p id="score-total" class="body-medium strong">-</p></div>
+          </div>
+        </section>
+
+        <section class="box card non-interactive sidebar-card run-details-card">
+          <h2 class="heading-xxxsmall">Run Details</h2>
+          <p id="status-text" class="body-small">Ready.</p>
+          <p id="path-text" class="code-small">Path: -</p>
+          <p id="visited-text" class="code-small">Visited: -</p>
+        </section>
+      </div>
     </section>
   </main>
 
