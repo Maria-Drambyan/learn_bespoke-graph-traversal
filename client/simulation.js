@@ -116,15 +116,18 @@ function normalizeDifficulty(rawValue) {
 }
 
 async function runStudent(graph, startId, goalId) {
-  const candidateUrls = [
+  const candidateBaseUrls = [
     './student-solution.js',
     '/student-solution.js',
     './solution.js',
     '/solution.js'
   ];
+  const cacheBust = `v=${Date.now()}`;
 
   let rawSource = null;
-  for (const url of candidateUrls) {
+  for (const baseUrl of candidateBaseUrls) {
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    const url = `${baseUrl}${separator}${cacheBust}`;
     try {
       const response = await fetch(url, { cache: 'no-store' });
       if (!response.ok) continue;
