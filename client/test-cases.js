@@ -1,5 +1,10 @@
 import { ALGORITHMS, solveByAlgorithm } from './algorithms.js';
 
+const MAP_WIDTH = 1200;
+const MAP_HEIGHT = 800;
+const lastTemplateBySetup = new Map();
+const lastVariantBySetup = new Map();
+
 const DIFFICULTY = {
   easy: {
     templates: ['cleanLane', 'cityGrid'],
@@ -181,6 +186,63 @@ function shuffle(list) {
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;
+}
+
+function getTemplateOrderForSetup(templateNames, setupKey) {
+  const order = shuffle(templateNames);
+  const lastTemplate = lastTemplateBySetup.get(setupKey);
+  if (lastTemplate && order.length > 1) {
+    const idx = order.indexOf(lastTemplate);
+    if (idx >= 0) {
+      const [same] = order.splice(idx, 1);
+      order.push(same);
+    }
+  }
+  return order;
+}
+
+function chooseLayoutVariant(setupKey) {
+  const variants = ['none', 'mirrorX', 'mirrorY', 'mirrorXY'];
+  const lastVariant = lastVariantBySetup.get(setupKey);
+  const pool = variants.length > 1 ? variants.filter((v) => v !== lastVariant) : variants;
+  const variant = pickRandom(pool);
+  lastVariantBySetup.set(setupKey, variant);
+  return variant;
+}
+
+function applyLayoutVariant(graph, houses, trees, variant) {
+  if (variant === 'none') {
+    return { graph, houses, trees };
+  }
+
+  const flipX = variant === 'mirrorX' || variant === 'mirrorXY';
+  const flipY = variant === 'mirrorY' || variant === 'mirrorXY';
+
+  const transformPoint = (x, y) => ({
+    x: flipX ? MAP_WIDTH - x : x,
+    y: flipY ? MAP_HEIGHT - y : y
+  });
+
+  const transformedGraph = {
+    ...graph,
+    nodes: graph.nodes.map((node) => {
+      const p = transformPoint(node.x, node.y);
+      return { ...node, x: p.x, y: p.y };
+    })
+  };
+
+  const transformedHouses = houses.map((house) => {
+    const x = flipX ? MAP_WIDTH - (house.x + house.w) : house.x;
+    const y = flipY ? MAP_HEIGHT - (house.y + house.h) : house.y;
+    return { ...house, x, y };
+  });
+
+  const transformedTrees = trees.map((tree) => {
+    const p = transformPoint(tree.x, tree.y);
+    return { ...tree, x: p.x, y: p.y };
+  });
+
+  return { graph: transformedGraph, houses: transformedHouses, trees: transformedTrees };
 }
 
 function randomDistractor(correctAlgorithm) {
@@ -556,6 +618,8 @@ export function generateCityMap({ correctAlgorithm = 'bfs', difficulty = 'medium
   const validDifficulty = DIFFICULTY[difficulty] ? difficulty : 'medium';
   const cfg = DIFFICULTY[validDifficulty];
   const templateNames = cfg.templates;
+  const setupKey = `${validCorrect}:${validDifficulty}`;
+  let templateOrder = getTemplateOrderForSetup(templateNames, setupKey);
 
   let template = null;
   let graph = null;
@@ -568,7 +632,10 @@ export function generateCityMap({ correctAlgorithm = 'bfs', difficulty = 'medium
   let trafficCars = [];
 
   for (let attempt = 0; attempt < 80; attempt += 1) {
-    template = TEMPLATES[pickRandom(templateNames)];
+    if (attempt > 0 && attempt % templateOrder.length === 0) {
+      templateOrder = getTemplateOrderForSetup(templateNames, setupKey);
+    }
+    template = TEMPLATES[templateOrder[attempt % templateOrder.length]];
     houses = template.houses.map((house) => ({ ...house }));
     trees = template.trees.map((tree) => ({ ...tree }));
     graph = buildGraph(template, cfg);
@@ -642,6 +709,16 @@ export function generateCityMap({ correctAlgorithm = 'bfs', difficulty = 'medium
     );
   }
 
+  if (template?.name) {
+    lastTemplateBySetup.set(setupKey, template.name);
+  }
+
+  const variant = chooseLayoutVariant(setupKey);
+  const transformed = applyLayoutVariant(graph, houses, trees, variant);
+  graph = transformed.graph;
+  houses = transformed.houses;
+  trees = transformed.trees;
+
   return {
     graph,
     startId: template.startId,
@@ -655,6 +732,7 @@ export function generateCityMap({ correctAlgorithm = 'bfs', difficulty = 'medium
       distractorAlgorithm,
       difficulty: validDifficulty,
       template: template.name,
+      layoutVariant: variant,
       distractorPathScore: distractorScore,
       generated: true
     }

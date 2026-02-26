@@ -16,6 +16,7 @@ try {
 }
 
 const DIST_DIR = path.join(__dirname, 'dist');
+const MAP_CACHE_PATH = path.join(__dirname, 'map-cache.json');
 // Check if IS_PRODUCTION is set to true
 const isProduction = process.env.IS_PRODUCTION === 'true';
 // In production mode, dist directory must exist
@@ -83,8 +84,133 @@ function resolveStudentSolutionPath() {
   return null;
 }
 
+function normalizeCacheKey(algorithm, difficulty) {
+  const algo = String(algorithm || '').trim();
+  const level = String(difficulty || '').trim();
+  if (!algo || !level) return null;
+  return `${algo}::${level}`;
+}
+
+function readMapCache() {
+  try {
+    if (!fs.existsSync(MAP_CACHE_PATH)) {
+      return {};
+    }
+    const raw = fs.readFileSync(MAP_CACHE_PATH, 'utf8');
+    if (!raw.trim()) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function writeMapCache(cache) {
+  fs.writeFileSync(MAP_CACHE_PATH, JSON.stringify(cache, null, 2), 'utf8');
+}
+
+function isSceneValid(scene) {
+  return Boolean(
+    scene &&
+    scene.graph &&
+    Array.isArray(scene.graph.nodes) &&
+    Array.isArray(scene.graph.edges) &&
+    typeof scene.startId === 'string' &&
+    typeof scene.goalId === 'string'
+  );
+}
+
+function handleMapCacheGet(res, parsedUrl) {
+  const key = normalizeCacheKey(parsedUrl.query?.algorithm, parsedUrl.query?.difficulty);
+  if (!key) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'algorithm and difficulty query params are required' }));
+    return;
+  }
+
+  const cache = readMapCache();
+  const scene = cache[key];
+  if (!scene || !isSceneValid(scene)) {
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'No cached map found' }));
+    return;
+  }
+
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ scene }));
+}
+
+function handleMapCacheDelete(res, parsedUrl) {
+  const key = normalizeCacheKey(parsedUrl.query?.algorithm, parsedUrl.query?.difficulty);
+
+  if (!key) {
+    if (fs.existsSync(MAP_CACHE_PATH)) {
+      fs.unlinkSync(MAP_CACHE_PATH);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, deleted: 'all' }));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, deleted: 'none' }));
+    return;
+  }
+
+  const cache = readMapCache();
+  if (!(key in cache)) {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, deleted: 'none' }));
+    return;
+  }
+
+  delete cache[key];
+  if (Object.keys(cache).length === 0) {
+    if (fs.existsSync(MAP_CACHE_PATH)) {
+      fs.unlinkSync(MAP_CACHE_PATH);
+    }
+  } else {
+    writeMapCache(cache);
+  }
+
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ success: true, deleted: key }));
+}
+
 // Handle POST requests
 function handlePostRequest(req, res, parsedUrl) {
+  if (parsedUrl.pathname === '/map-cache') {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      try {
+        const data = JSON.parse(body || '{}');
+        const key = normalizeCacheKey(data.algorithm, data.difficulty);
+        if (!key) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'algorithm and difficulty are required' }));
+          return;
+        }
+        if (!isSceneValid(data.scene)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'scene payload is invalid' }));
+          return;
+        }
+
+        const cache = readMapCache();
+        cache[key] = data.scene;
+        writeMapCache(cache);
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, key }));
+      } catch (_) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid JSON' }));
+      }
+    });
+    return;
+  }
+
   if (parsedUrl.pathname === '/message') {
     let body = '';
 
@@ -138,6 +264,16 @@ function handlePostRequest(req, res, parsedUrl) {
 const server = http.createServer((req, res) => {
   const parsedUrl = url.parse(req.url, true);
   let pathName = parsedUrl.pathname === '/' ? '/index.html' : parsedUrl.pathname;
+
+  if (req.method === 'GET' && parsedUrl.pathname === '/map-cache') {
+    handleMapCacheGet(res, parsedUrl);
+    return;
+  }
+
+  if (req.method === 'DELETE' && parsedUrl.pathname === '/map-cache') {
+    handleMapCacheDelete(res, parsedUrl);
+    return;
+  }
 
   // Handle POST requests
   if (req.method === 'POST') {

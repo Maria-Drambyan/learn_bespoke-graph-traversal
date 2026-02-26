@@ -9,6 +9,86 @@ import {
 
 const KNOWN_ALGOS = ['bfs', 'dfs', 'dijkstra', 'astar', 'bellmanFord'];
 const KNOWN_DIFFICULTIES = ['easy', 'medium', 'hard'];
+const LOCAL_SCENE_CACHE_PREFIX = 'graph-drive:scene:v1';
+
+function isSceneShapeValid(scene) {
+  return Boolean(
+    scene &&
+    scene.graph &&
+    Array.isArray(scene.graph.nodes) &&
+    Array.isArray(scene.graph.edges) &&
+    typeof scene.startId === 'string' &&
+    typeof scene.goalId === 'string'
+  );
+}
+
+function localSceneCacheKey(correctAlgorithm, difficulty) {
+  return `${LOCAL_SCENE_CACHE_PREFIX}:${correctAlgorithm}:${difficulty}`;
+}
+
+function loadLocalCachedScene(cacheKey) {
+  try {
+    const raw = localStorage.getItem(cacheKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return isSceneShapeValid(parsed) ? parsed : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function saveLocalCachedScene(cacheKey, scene) {
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify(scene));
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function loadCachedScene(correctAlgorithm, difficulty, cacheKey) {
+  try {
+    const params = new URLSearchParams({
+      algorithm: correctAlgorithm,
+      difficulty
+    });
+    const response = await fetch(`/map-cache?${params.toString()}`, { cache: 'no-store' });
+    if (!response.ok) {
+      return loadLocalCachedScene(cacheKey);
+    }
+    const data = await response.json();
+    if (!isSceneShapeValid(data.scene)) {
+      return loadLocalCachedScene(cacheKey);
+    }
+    saveLocalCachedScene(cacheKey, data.scene);
+    return data.scene;
+  } catch (_) {
+    return loadLocalCachedScene(cacheKey);
+  }
+}
+
+async function saveCachedScene(correctAlgorithm, difficulty, scene, cacheKey) {
+  if (!isSceneShapeValid(scene)) {
+    return false;
+  }
+
+  const localSaved = saveLocalCachedScene(cacheKey, scene);
+
+  try {
+    const response = await fetch('/map-cache', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        algorithm: correctAlgorithm,
+        difficulty,
+        scene
+      })
+    });
+    return response.ok || localSaved;
+  } catch (_) {
+    return localSaved;
+  }
+}
 
 function normalizeAlgorithm(rawValue) {
   const value = String(rawValue || '').trim().toLowerCase();
@@ -292,11 +372,16 @@ async function initializeSimulation() {
   const solverOptions = document.getElementById('algorithm-options');
 
   const defaults = getInputDefaultsFromEnv();
+  const sceneCacheKey = localSceneCacheKey(defaults.validCorrect, defaults.validDifficulty);
 
-  let scene = generateCityMap({
-    correctAlgorithm: defaults.validCorrect,
-    difficulty: defaults.validDifficulty
-  });
+  let scene = await loadCachedScene(defaults.validCorrect, defaults.validDifficulty, sceneCacheKey);
+  if (!scene) {
+    scene = generateCityMap({
+      correctAlgorithm: defaults.validCorrect,
+      difficulty: defaults.validDifficulty
+    });
+    await saveCachedScene(defaults.validCorrect, defaults.validDifficulty, scene, sceneCacheKey);
+  }
   visualizer.setScene(scene);
   setupSolverChoices(solverOptions, scene);
 
