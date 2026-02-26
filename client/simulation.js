@@ -117,10 +117,10 @@ function normalizeDifficulty(rawValue) {
 
 async function runStudent(graph, startId, goalId) {
   const candidateBaseUrls = [
-    './student-solution.js',
-    '/student-solution.js',
     './solution.js',
-    '/solution.js'
+    '/solution.js',
+    './student-solution.js',
+    '/student-solution.js'
   ];
   const cacheBust = `v=${Date.now()}`;
 
@@ -189,9 +189,12 @@ self.onmessage = function (event) {
         resolve(event.data.result);
       };
 
-      worker.onerror = () => {
+      worker.onerror = (event) => {
         clearTimeout(timer);
-        reject(new Error('Student solution crashed while running.'));
+        const message = event?.message || 'Student solution crashed while running.';
+        const line = event?.lineno ? ` (line ${event.lineno})` : '';
+        const col = event?.colno ? `, col ${event.colno}` : '';
+        reject(new Error(`${message}${line}${col}`));
       };
 
       worker.postMessage({ graph, startId, goalId });
