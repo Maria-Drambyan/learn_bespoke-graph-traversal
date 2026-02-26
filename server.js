@@ -17,6 +17,7 @@ try {
 
 const DIST_DIR = path.join(__dirname, 'dist');
 const MAP_CACHE_PATH = path.join(__dirname, 'map-cache.json');
+const USER_ACTIONS_LOG_PATH = path.join(__dirname, 'logs', 'user_actions.log');
 // Check if IS_PRODUCTION is set to true
 const isProduction = process.env.IS_PRODUCTION === 'true';
 // In production mode, dist directory must exist
@@ -71,8 +72,11 @@ function serveFile(filePath, res) {
 function resolveStudentSolutionPath() {
   const candidates = [
     path.join(__dirname, 'student-solution.js'),
+    path.join(__dirname, 'solution.js'),
     path.join(__dirname, 'client', 'student-solution.js'),
-    path.join(DIST_DIR, 'student-solution.js')
+    path.join(__dirname, 'client', 'solution.js'),
+    path.join(DIST_DIR, 'student-solution.js'),
+    path.join(DIST_DIR, 'solution.js')
   ];
 
   for (const candidate of candidates) {
@@ -107,6 +111,14 @@ function readMapCache() {
 
 function writeMapCache(cache) {
   fs.writeFileSync(MAP_CACHE_PATH, JSON.stringify(cache, null, 2), 'utf8');
+}
+
+function appendUserActionLog(entry) {
+  const logDir = path.dirname(USER_ACTIONS_LOG_PATH);
+  if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
+  }
+  fs.appendFileSync(USER_ACTIONS_LOG_PATH, `${JSON.stringify(entry)}\n`, 'utf8');
 }
 
 function isSceneValid(scene) {
@@ -254,6 +266,39 @@ function handlePostRequest(req, res, parsedUrl) {
         res.end(JSON.stringify({ error: 'Invalid JSON' }));
       }
     });
+    return;
+  }
+
+  if (parsedUrl.pathname === '/user-actions') {
+    let body = '';
+
+    req.on('data', (chunk) => {
+      body += chunk.toString();
+    });
+
+    req.on('end', () => {
+      try {
+        const data = JSON.parse(body || '{}');
+        if (!data || typeof data !== 'object') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid payload' }));
+          return;
+        }
+
+        const entry = {
+          ts: new Date().toISOString(),
+          ...data
+        };
+
+        appendUserActionLog(entry);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (_) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid JSON' }));
+      }
+    });
+    return;
   } else {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not found');
@@ -283,11 +328,11 @@ const server = http.createServer((req, res) => {
 
   // In production mode, serve static files from dist directory
   if (isProduction) {
-    if (pathName === '/student-solution.js') {
+    if (pathName === '/student-solution.js' || pathName === '/solution.js') {
       const solutionPath = resolveStudentSolutionPath();
       if (!solutionPath) {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('student-solution.js not found');
+        res.end('solution.js or student-solution.js not found');
         return;
       }
       serveFile(solutionPath, res);

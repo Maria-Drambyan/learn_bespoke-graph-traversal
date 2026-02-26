@@ -118,7 +118,9 @@ function normalizeDifficulty(rawValue) {
 async function runStudent(graph, startId, goalId) {
   const candidateUrls = [
     './student-solution.js',
-    '/student-solution.js'
+    '/student-solution.js',
+    './solution.js',
+    '/solution.js'
   ];
 
   let rawSource = null;
@@ -136,7 +138,7 @@ async function runStudent(graph, startId, goalId) {
   }
 
   if (!rawSource) {
-    throw new Error('Could not load /student-solution.js');
+    throw new Error('Could not load student solution (expected /solution.js or /student-solution.js).');
   }
   const normalizedSource = rawSource
     .replace(/export\s+function\s+solvePath/g, 'function solvePath')
@@ -151,7 +153,7 @@ self.onmessage = function (event) {
 
   try {
     if (typeof solvePath !== 'function') {
-      throw new Error('student-solution.js must export solvePath(graph, startId, goalId).');
+      throw new Error('solution.js must export solvePath(graph, startId, goalId).');
     }
     const result = solvePath(graph, startId, goalId);
     self.postMessage({ ok: true, result: result });
@@ -231,6 +233,18 @@ function updateRunUI({ status, path, visited }) {
 
 function setHud(timeSec) {
   document.getElementById('time-chip').textContent = `Time: ${timeSec.toFixed(1)}s`;
+}
+
+async function saveUserActionLog(entry) {
+  try {
+    await fetch('/user-actions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry)
+    });
+  } catch (_) {
+    // Ignore log failures so simulation flow is never blocked.
+  }
 }
 
 function edgeExists(graph, from, to) {
@@ -485,13 +499,43 @@ async function initializeSimulation() {
         path,
         visited: traversedNodes
       });
+
+      await saveUserActionLog({
+        event: 'run_completed',
+        selectedSolver: selected,
+        runDetails: {
+          status: finalStatus,
+          path,
+          visited: traversedNodes
+        },
+        score: {
+          correctness: score.correctnessScore,
+          optimality: score.optimalityScore,
+          efficiency: score.efficiencyScore,
+          total: score.totalScore,
+          valid: score.valid,
+          studentCost,
+          optimalCost: optimalSolution.cost
+        }
+      });
     } catch (err) {
+      const selected = getSelectedSolver(solverOptions) || 'algorithm';
       updateRunUI({
         status: `Run failed: ${err.message}`,
         path: [],
         visited: []
       });
       setHud(0);
+      await saveUserActionLog({
+        event: 'run_failed',
+        selectedSolver: selected,
+        runDetails: {
+          status: `Run failed: ${err.message}`,
+          path: [],
+          visited: []
+        },
+        score: null
+      });
     } finally {
       running = false;
       runButton.disabled = false;
