@@ -87,16 +87,27 @@ export class MapVisualizer {
     ctx.fillStyle = grass;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const topBandY = Math.floor(canvas.height * 0.13);
-    const bottomBandY = Math.floor(canvas.height * 0.88);
-    const leftBandW = Math.floor(canvas.width * 0.38);
-    const rightBandX = Math.floor(canvas.width * 0.44);
-    const rightBandW = Math.floor(canvas.width * 0.47);
+    const roadHalfWidth = 52;
+    const roadSafePad = 18;
+    const nodeXs = this.scene.graph.nodes.map((n) => n.x);
+    const nodeYs = this.scene.graph.nodes.map((n) => n.y);
+    const roadMinY = Math.max(0, Math.min(...nodeYs) - roadHalfWidth - roadSafePad);
+    const roadMaxY = Math.min(canvas.height, Math.max(...nodeYs) + roadHalfWidth + roadSafePad);
 
     ctx.fillStyle = grassDark;
-    ctx.fillRect(70, topBandY, leftBandW, 64);
-    ctx.fillRect(rightBandX, topBandY, rightBandW, 64);
-    ctx.fillRect(70, bottomBandY, canvas.width - 140, 48);
+    const topMargin = 24;
+    const bottomMargin = 18;
+    const topHeight = Math.max(0, roadMinY - topMargin);
+    const bottomTop = roadMaxY + 8;
+    const bottomHeight = Math.max(0, canvas.height - bottomTop - bottomMargin);
+
+    if (topHeight > 18) {
+      ctx.fillRect(70, topMargin, canvas.width - 140, topHeight);
+    }
+
+    if (bottomHeight > 18) {
+      ctx.fillRect(70, bottomTop, canvas.width - 140, bottomHeight);
+    }
 
     for (const house of this.scene.houses) {
       ctx.save();
