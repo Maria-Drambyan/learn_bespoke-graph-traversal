@@ -70,13 +70,16 @@ function serveFile(filePath, res) {
 }
 
 function resolveStudentSolutionPath() {
+  const usercodeRoot = process.env.USERCODE_DIR || '/usercode/FILESYSTEM';
   const candidates = [
     path.join(__dirname, 'student-solution.js'),
     path.join(__dirname, 'solution.js'),
     path.join(__dirname, 'client', 'student-solution.js'),
     path.join(__dirname, 'client', 'solution.js'),
     path.join(DIST_DIR, 'student-solution.js'),
-    path.join(DIST_DIR, 'solution.js')
+    path.join(DIST_DIR, 'solution.js'),
+    path.join(usercodeRoot, 'student-solution.js'),
+    path.join(usercodeRoot, 'solution.js')
   ];
 
   for (const candidate of candidates) {
