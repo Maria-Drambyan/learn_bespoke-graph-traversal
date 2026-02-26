@@ -479,6 +479,15 @@ function pathDifferenceScore(pathA = [], pathB = []) {
   return mismatches;
 }
 
+function distractorOnlyNodes(correctPath = [], distractorPath = [], startId, goalId) {
+  const correctSet = new Set(correctPath);
+  return distractorPath.filter((id) => (
+    id !== startId &&
+    id !== goalId &&
+    !correctSet.has(id)
+  ));
+}
+
 function chooseBestDistractor(correctAlgorithm, graph, startId, goalId, targetResult) {
   const candidates = Object.keys(ALGORITHMS).filter((name) => name !== correctAlgorithm);
   let best = null;
@@ -489,9 +498,17 @@ function chooseBestDistractor(correctAlgorithm, graph, startId, goalId, targetRe
       continue;
     }
 
+    const uniqueNodes = distractorOnlyNodes(targetResult.path, result.path, startId, goalId).length;
+    if (uniqueNodes < 1) {
+      continue;
+    }
     const score = pathDifferenceScore(targetResult.path, result.path);
-    if (!best || score > best.score) {
-      best = { algorithm: algo, result, score };
+    if (
+      !best ||
+      uniqueNodes > best.uniqueNodes ||
+      (uniqueNodes === best.uniqueNodes && score > best.score)
+    ) {
+      best = { algorithm: algo, result, score, uniqueNodes };
     }
   }
 
@@ -529,22 +546,31 @@ function pickTraffic(graph, startId, goalId, correctPath, distractorPath, count)
   return unique;
 }
 
+function pathHitsTraffic(path, trafficCars) {
+  const trafficSet = new Set(trafficCars || []);
+  return (path || []).some((nodeId) => trafficSet.has(nodeId));
+}
+
 export function generateCityMap({ correctAlgorithm = 'bfs', difficulty = 'medium' } = {}) {
   const validCorrect = ALGORITHMS[correctAlgorithm] ? correctAlgorithm : 'bfs';
   const validDifficulty = DIFFICULTY[difficulty] ? difficulty : 'medium';
   const cfg = DIFFICULTY[validDifficulty];
-  const template = TEMPLATES[pickRandom(cfg.templates)];
+  const templateNames = cfg.templates;
 
+  let template = null;
   let graph = null;
   let distractorAlgorithm = null;
   let targetResult = null;
   let distractorResult = null;
   let distractorScore = 0;
-
-  const houses = template.houses.map((house) => ({ ...house }));
-  const trees = template.trees.map((tree) => ({ ...tree }));
+  let houses = [];
+  let trees = [];
+  let trafficCars = [];
 
   for (let attempt = 0; attempt < 80; attempt += 1) {
+    template = TEMPLATES[pickRandom(templateNames)];
+    houses = template.houses.map((house) => ({ ...house }));
+    trees = template.trees.map((tree) => ({ ...tree }));
     graph = buildGraph(template, cfg);
     if (!isConnectedGraph(graph, template.startId)) continue;
     if (!hasReadableGeometry(graph, cfg)) continue;
@@ -565,10 +591,27 @@ export function generateCityMap({ correctAlgorithm = 'bfs', difficulty = 'medium
     distractorResult = distractor.result;
     distractorScore = distractor.score;
     if (distractorScore < 1) continue;
+
+    const candidateTraffic = pickTraffic(
+      graph,
+      template.startId,
+      template.goalId,
+      targetResult.path,
+      distractorResult.path,
+      cfg.trafficCount
+    );
+    if (!candidateTraffic.length) continue;
+    if (!pathHitsTraffic(distractorResult.path, candidateTraffic)) continue;
+    if (pathHitsTraffic(targetResult.path, candidateTraffic)) continue;
+
+    trafficCars = candidateTraffic;
     break;
   }
 
   if (!graph || !targetResult || !validResult(targetResult, template.startId, template.goalId)) {
+    template = template || TEMPLATES[templateNames[0]];
+    houses = template.houses.map((house) => ({ ...house }));
+    trees = template.trees.map((tree) => ({ ...tree }));
     graph = {
       nodes: template.nodes.map((node) => ({ ...node })),
       edges: template.edges.map(([from, to]) => ({
@@ -588,16 +631,16 @@ export function generateCityMap({ correctAlgorithm = 'bfs', difficulty = 'medium
     distractorAlgorithm = distractor.algorithm;
     distractorResult = distractor.result;
     distractorScore = distractor.score;
-  }
 
-  const trafficCars = pickTraffic(
-    graph,
-    template.startId,
-    template.goalId,
-    targetResult.path,
-    distractorResult.path,
-    cfg.trafficCount
-  );
+    trafficCars = pickTraffic(
+      graph,
+      template.startId,
+      template.goalId,
+      targetResult.path,
+      distractorResult.path,
+      cfg.trafficCount
+    );
+  }
 
   return {
     graph,

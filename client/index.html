@@ -25,8 +25,6 @@
 <body class="bespoke simulation-app">
   <header class="header">
     <h1 class="heading-small">Graph Drive Simulator</h1>
-    <div class="spacer"></div>
-    <span id="scenario-chip" class="tag info">Scenario: -</span>
   </header>
 
   <main class="main-layout">
@@ -34,28 +32,11 @@
       <section class="box card non-interactive sidebar-card">
         <h2 class="heading-xxxsmall">Run Controls</h2>
 
-        <label for="algorithm-select" class="label-medium">Solver</label>
-        <select id="algorithm-select" class="input"></select>
-
-        <label for="correct-algo-select" class="label-medium">Correct Algorithm Input</label>
-        <select id="correct-algo-select" class="input">
-          <option value="bfs">BFS</option>
-          <option value="dfs">DFS</option>
-          <option value="dijkstra">Dijkstra</option>
-          <option value="astar">A*</option>
-          <option value="bellmanFord">Bellman-Ford</option>
-        </select>
-
-        <label for="difficulty-select" class="label-medium">Difficulty Input</label>
-        <select id="difficulty-select" class="input">
-          <option value="easy">Easy</option>
-          <option value="medium" selected>Medium</option>
-          <option value="hard">Hard</option>
-        </select>
+        <span class="label-medium">Solver</span>
+        <div id="algorithm-options" class="algorithm-options" role="radiogroup" aria-label="Solver options"></div>
 
         <div class="row control-row">
           <button id="run-btn" class="button button-primary">Run Solution</button>
-          <button id="generate-btn" class="button button-tertiary">Generate Map</button>
           <button id="reset-btn" class="button button-secondary">Reset</button>
         </div>
       </section>

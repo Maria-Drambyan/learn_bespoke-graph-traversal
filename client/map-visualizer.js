@@ -14,6 +14,15 @@ function angleFromPoints(from, to) {
   return Math.atan2(to.y - from.y, to.x - from.x);
 }
 
+function edgeHash(a, b) {
+  const s = `${a}|${b}`;
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) {
+    h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  }
+  return h;
+}
+
 export class MapVisualizer {
   constructor(canvasId) {
     this.canvas = document.getElementById(canvasId);
@@ -255,9 +264,15 @@ export class MapVisualizer {
       const dx = to.x - from.x;
       const dy = to.y - from.y;
       const length = Math.hypot(dx, dy) || 1;
-      const offset = 30;
-      let labelX = midX - (dy / length) * offset;
-      let labelY = midY + (dx / length) * offset;
+      if (length < 92) {
+        continue;
+      }
+      const isHorizontal = Math.abs(dy) <= 2;
+      const isVertical = Math.abs(dx) <= 2;
+      const hashSign = edgeHash(edge.from, edge.to) % 2 === 0 ? 1 : -1;
+      const nx = -dy / length;
+      const ny = dx / length;
+      const laneOffset = isHorizontal || isVertical ? 18 : 14;
       const text = String(cost);
 
       ctx.font = '700 18px "Work Sans", sans-serif';
@@ -267,38 +282,47 @@ export class MapVisualizer {
       const boxW = textWidth + padX * 2;
       const boxH = 30;
 
-      // If a new label overlaps an older label, push it farther from the road.
-      let guard = 0;
-      let overlaps = false;
-      while (guard < 6) {
-        overlaps = occupiedWeightSpots.some((spot) => (
-          Math.abs(labelX - spot.x) < (boxW / 2 + spot.w / 2 + 8) &&
-          Math.abs(labelY - spot.y) < (boxH / 2 + spot.h / 2 + 8)
+      // Deterministic placement: try one side of the segment, then the opposite.
+      let labelX = null;
+      let labelY = null;
+      const sideCandidates = [hashSign, -hashSign];
+      for (const side of sideCandidates) {
+        const candidateX = midX + nx * laneOffset * side;
+        const candidateY = midY + ny * laneOffset * side;
+
+        const alongT = ((candidateX - from.x) * dx + (candidateY - from.y) * dy) / (length * length);
+        if (alongT < 0.24 || alongT > 0.76) {
+          continue;
+        }
+        const perpDist = Math.abs((candidateX - from.x) * dy - (candidateY - from.y) * dx) / length;
+        if (perpDist > 30) {
+          continue;
+        }
+        const overlaps = occupiedWeightSpots.some((spot) => (
+          Math.abs(candidateX - spot.x) < (boxW / 2 + spot.w / 2 + 8) &&
+          Math.abs(candidateY - spot.y) < (boxH / 2 + spot.h / 2 + 8)
         ));
-        if (!overlaps) break;
-        labelX -= (dy / length) * 14;
-        labelY += (dx / length) * 14;
-        guard += 1;
+        if (overlaps) {
+          continue;
+        }
+
+        const nearNode = this.scene.graph.nodes.some((node) => (
+          Math.hypot(candidateX - node.x, candidateY - node.y) < 64
+        ));
+        if (nearNode) {
+          continue;
+        }
+
+        labelX = candidateX;
+        labelY = candidateY;
+        break;
       }
 
-      overlaps = occupiedWeightSpots.some((spot) => (
-        Math.abs(labelX - spot.x) < (boxW / 2 + spot.w / 2 + 8) &&
-        Math.abs(labelY - spot.y) < (boxH / 2 + spot.h / 2 + 8)
-      ));
-      if (overlaps) {
+      if (labelX == null || labelY == null) {
         continue;
       }
 
       occupiedWeightSpots.push({ x: labelX, y: labelY, w: boxW, h: boxH });
-
-      ctx.strokeStyle = weightStroke;
-      ctx.lineWidth = 2;
-      ctx.globalAlpha = 0.75;
-      ctx.beginPath();
-      ctx.moveTo(midX, midY);
-      ctx.lineTo(labelX, labelY);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
 
       ctx.save();
       ctx.shadowColor = getToken('--Colors-Base-Neutral-Alphas-1300-50', 'rgba(30, 41, 67, .5)');

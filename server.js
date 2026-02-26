@@ -67,6 +67,22 @@ function serveFile(filePath, res) {
   });
 }
 
+function resolveStudentSolutionPath() {
+  const candidates = [
+    path.join(__dirname, 'student-solution.js'),
+    path.join(__dirname, 'client', 'student-solution.js'),
+    path.join(DIST_DIR, 'student-solution.js')
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 // Handle POST requests
 function handlePostRequest(req, res, parsedUrl) {
   if (parsedUrl.pathname === '/message') {
@@ -131,6 +147,17 @@ const server = http.createServer((req, res) => {
 
   // In production mode, serve static files from dist directory
   if (isProduction) {
+    if (pathName === '/student-solution.js') {
+      const solutionPath = resolveStudentSolutionPath();
+      if (!solutionPath) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('student-solution.js not found');
+        return;
+      }
+      serveFile(solutionPath, res);
+      return;
+    }
+
     // Strip leading slashes so path.join/resolve can't ignore DIST_DIR
     let filePath = path.join(DIST_DIR, pathName.replace(/^\/+/, ''));
 

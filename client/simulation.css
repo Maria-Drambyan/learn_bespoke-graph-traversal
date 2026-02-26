@@ -28,6 +28,13 @@
   flex-wrap: wrap;
 }
 
+.algorithm-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--UI-Spacing-spacing-s);
+  margin-top: var(--UI-Spacing-spacing-xs);
+}
+
 .score-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

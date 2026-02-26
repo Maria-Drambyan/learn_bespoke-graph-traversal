@@ -1,6 +1,6 @@
 import { MapVisualizer } from './map-visualizer.js';
 import { generateCityMap } from './test-cases.js';
-import { solveByAlgorithm } from './algorithms.js';
+import studentSolutionFallback from './student-solution.js?raw';
 import {
   calculateScore,
   computePathCost,
@@ -10,13 +10,55 @@ import {
 const KNOWN_ALGOS = ['bfs', 'dfs', 'dijkstra', 'astar', 'bellmanFord'];
 const KNOWN_DIFFICULTIES = ['easy', 'medium', 'hard'];
 
+function normalizeAlgorithm(rawValue) {
+  const value = String(rawValue || '').trim().toLowerCase();
+  if (!value) return null;
+
+  const aliases = {
+    bfs: 'bfs',
+    dfs: 'dfs',
+    dijkstra: 'dijkstra',
+    dijisktra: 'dijkstra',
+    djikstra: 'dijkstra',
+    'a*': 'astar',
+    astar: 'astar',
+    bellmanford: 'bellmanFord',
+    'bellman-ford': 'bellmanFord'
+  };
+
+  return aliases[value] || null;
+}
+
+function normalizeDifficulty(rawValue) {
+  const value = String(rawValue || '').trim().toLowerCase();
+  if (!value) return null;
+  if (value === 'easy' || value === 'medium' || value === 'hard') return value;
+  return null;
+}
+
 async function runStudent(graph, startId, goalId) {
-  const response = await fetch('./student-solution.js');
-  if (!response.ok) {
-    throw new Error('Could not load student-solution.js');
+  const candidateUrls = [
+    './student-solution.js',
+    '/student-solution.js'
+  ];
+
+  let rawSource = null;
+  for (const url of candidateUrls) {
+    try {
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) continue;
+      rawSource = await response.text();
+      if (rawSource && rawSource.trim().length > 0) {
+        break;
+      }
+    } catch (_) {
+      // Try next URL.
+    }
   }
 
-  const rawSource = await response.text();
+  if (!rawSource) {
+    rawSource = studentSolutionFallback;
+  }
   const normalizedSource = rawSource
     .replace(/export\s+function\s+solvePath/g, 'function solvePath')
     .replace(/export\s+\{[^}]*\};?/g, '');
@@ -169,22 +211,28 @@ function buildAnimationAttempt(graph, path, startId, goalId) {
 }
 
 function sanitizeInput(correctAlgorithm, difficulty) {
-  const validCorrect = KNOWN_ALGOS.includes(correctAlgorithm) ? correctAlgorithm : 'bfs';
-  const validDifficulty = KNOWN_DIFFICULTIES.includes(difficulty) ? difficulty : 'medium';
+  const normalizedAlgo = normalizeAlgorithm(correctAlgorithm);
+  const normalizedDifficulty = normalizeDifficulty(difficulty);
+  const validCorrect = KNOWN_ALGOS.includes(normalizedAlgo) ? normalizedAlgo : 'bfs';
+  const validDifficulty = KNOWN_DIFFICULTIES.includes(normalizedDifficulty) ? normalizedDifficulty : 'medium';
   return { validCorrect, validDifficulty };
 }
 
 function getInputDefaultsFromEnv() {
-  const correctAlgorithm = import.meta.env.VITE_CORRECT_ALGO || 'bfs';
-  const difficulty = import.meta.env.VITE_DIFFICULTY || 'medium';
-  return sanitizeInput(String(correctAlgorithm), String(difficulty));
-}
+  const params = new URLSearchParams(window.location.search);
+  const queryAlgo = params.get('algo') || params.get('algorithm') || params.get('correct');
+  const queryDifficulty = params.get('difficulty') || params.get('level');
 
-function updateScenarioChip(scene) {
-  const chip = document.getElementById('scenario-chip');
-  if (!chip || !scene?.meta) return;
-  const m = scene.meta;
-  chip.textContent = `Target: ${m.correctAlgorithm} | Distractor: ${m.distractorAlgorithm} | ${m.difficulty}`;
+  const globalConfig = window.__SIM_CONFIG__ || {};
+  const configAlgo = globalConfig.correctAlgorithm || globalConfig.algorithm;
+  const configDifficulty = globalConfig.difficulty || globalConfig.level;
+
+  const envAlgo = import.meta.env.VITE_CORRECT_ALGO || 'bfs';
+  const envDifficulty = import.meta.env.VITE_DIFFICULTY || 'medium';
+
+  const correctAlgorithm = queryAlgo || configAlgo || envAlgo;
+  const difficulty = queryDifficulty || configDifficulty || envDifficulty;
+  return sanitizeInput(String(correctAlgorithm), String(difficulty));
 }
 
 function prettifyAlgo(name) {
@@ -198,21 +246,42 @@ function prettifyAlgo(name) {
   return labels[name] || name;
 }
 
-function setupSolverChoices(selectEl, scene) {
+function setupSolverChoices(containerEl, scene) {
   const target = scene.meta.correctAlgorithm;
   const distractor = scene.meta.distractorAlgorithm;
+  const values = [distractor, target];
 
-  selectEl.innerHTML = '';
-  const targetOption = document.createElement('option');
-  targetOption.value = target;
-  targetOption.textContent = `Correct Candidate (${prettifyAlgo(target)})`;
+  containerEl.innerHTML = '';
+  values.forEach((value, index) => {
+    const label = document.createElement('label');
+    label.className = 'input-radio input-radio-small';
 
-  const distractorOption = document.createElement('option');
-  distractorOption.value = distractor;
-  distractorOption.textContent = `Distractor Candidate (${prettifyAlgo(distractor)})`;
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'solver-choice';
+    input.value = value;
+    input.checked = index === 0;
 
-  selectEl.appendChild(targetOption);
-  selectEl.appendChild(distractorOption);
+    const circle = document.createElement('span');
+    circle.className = 'input-radio-circle';
+    const dot = document.createElement('span');
+    dot.className = 'input-radio-dot';
+    circle.appendChild(dot);
+
+    const text = document.createElement('span');
+    text.className = 'input-radio-label';
+    text.textContent = prettifyAlgo(value);
+
+    label.appendChild(input);
+    label.appendChild(circle);
+    label.appendChild(text);
+    containerEl.appendChild(label);
+  });
+}
+
+function getSelectedSolver(containerEl) {
+  const selected = containerEl.querySelector('input[name="solver-choice"]:checked');
+  return selected ? selected.value : '';
 }
 
 async function initializeSimulation() {
@@ -220,22 +289,16 @@ async function initializeSimulation() {
 
   const runButton = document.getElementById('run-btn');
   const resetButton = document.getElementById('reset-btn');
-  const generateButton = document.getElementById('generate-btn');
-  const solverSelect = document.getElementById('algorithm-select');
-  const correctSelect = document.getElementById('correct-algo-select');
-  const difficultySelect = document.getElementById('difficulty-select');
+  const solverOptions = document.getElementById('algorithm-options');
 
   const defaults = getInputDefaultsFromEnv();
-  correctSelect.value = defaults.validCorrect;
-  difficultySelect.value = defaults.validDifficulty;
 
   let scene = generateCityMap({
     correctAlgorithm: defaults.validCorrect,
     difficulty: defaults.validDifficulty
   });
   visualizer.setScene(scene);
-  setupSolverChoices(solverSelect, scene);
-  updateScenarioChip(scene);
+  setupSolverChoices(solverOptions, scene);
 
   let running = false;
 
@@ -257,24 +320,12 @@ async function initializeSimulation() {
     });
 
     updateRunUI({
-      status: `Ready. Target is ${scene.meta.correctAlgorithm} on ${scene.meta.difficulty}.`,
+      status: 'Ready.',
       path: [],
       visited: []
     });
 
     setHud(0);
-  };
-
-  const regenerate = () => {
-    const input = sanitizeInput(correctSelect.value, difficultySelect.value);
-    scene = generateCityMap({
-      correctAlgorithm: input.validCorrect,
-      difficulty: input.validDifficulty
-    });
-    visualizer.setScene(scene);
-    setupSolverChoices(solverSelect, scene);
-    updateScenarioChip(scene);
-    reset();
   };
 
   reset();
@@ -285,21 +336,15 @@ async function initializeSimulation() {
     running = true;
     runButton.disabled = true;
     resetButton.disabled = true;
-    generateButton.disabled = true;
 
     try {
-      const selected = solverSelect.value;
-      let studentSolution;
-
-      if (selected === 'student') {
-        studentSolution = await runStudent(scene.graph, scene.startId, scene.goalId);
-      } else {
-        studentSolution = solveByAlgorithm(selected, scene.graph, scene.startId, scene.goalId);
-      }
+      const selected = getSelectedSolver(solverOptions) || 'algorithm';
+      const studentSolution = await runStudent(scene.graph, scene.startId, scene.goalId);
 
       const path = studentSolution.path ?? [];
       const visitedNodes = studentSolution.visitedNodes ?? [];
       const attempt = buildAnimationAttempt(scene.graph, path, scene.startId, scene.goalId);
+      const traversedNodes = attempt.animPath ?? [];
       const optimalSolution = findOptimalSolution(scene.graph, scene.startId, scene.goalId);
 
       const score = calculateScore({
@@ -312,14 +357,14 @@ async function initializeSimulation() {
 
       updateScoreUI(score);
       updateRunUI({
-        status: `Running ${selected.toUpperCase()} animation...`,
+        status: `Running student solution (${selected.toUpperCase()})...`,
         path,
-        visited: visitedNodes
+        visited: traversedNodes
       });
 
       if (attempt.animPath.length < 2) {
         visualizer.draw({
-          visitedNodes,
+          visitedNodes: traversedNodes,
           path: attempt.animPath,
           carNodeId: scene.startId,
           carPoint: null,
@@ -328,12 +373,12 @@ async function initializeSimulation() {
         updateRunUI({
           status: `Incorrect: ${attempt.issue}`,
           path,
-          visited: visitedNodes
+          visited: traversedNodes
         });
         return;
       }
 
-      const animationResult = await visualizer.animatePath(attempt.animPath, visitedNodes, ({ seconds }) => {
+      const animationResult = await visualizer.animatePath(attempt.animPath, traversedNodes, ({ seconds }) => {
         setHud(seconds);
       });
 
@@ -354,7 +399,7 @@ async function initializeSimulation() {
       updateRunUI({
         status: finalStatus,
         path,
-        visited: visitedNodes
+        visited: traversedNodes
       });
     } catch (err) {
       updateRunUI({
@@ -367,12 +412,10 @@ async function initializeSimulation() {
       running = false;
       runButton.disabled = false;
       resetButton.disabled = false;
-      generateButton.disabled = false;
     }
   });
 
   resetButton.addEventListener('click', reset);
-  generateButton.addEventListener('click', regenerate);
 }
 
 if (document.readyState === 'loading') {
