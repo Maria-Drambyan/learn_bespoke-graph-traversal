@@ -35,7 +35,7 @@ function normalizeDifficulty(rawValue) {
   return null;
 }
 
-async function runStudent(graph, startId, goalId) {
+async function runStudent(graph, startId, goalId, trafficCars = []) {
   const candidateBaseUrls = [
     './solution.js',
     '/solution.js',
@@ -73,12 +73,13 @@ self.onmessage = function (event) {
   const graph = event.data.graph;
   const startId = event.data.startId;
   const goalId = event.data.goalId;
+  const trafficCars = Array.isArray(event.data.trafficCars) ? event.data.trafficCars : [];
 
   try {
     if (typeof solvePath !== 'function') {
       throw new Error('solution.js must export solvePath(graph, startId, goalId).');
     }
-    const result = solvePath(graph, startId, goalId);
+    const result = solvePath(graph, startId, goalId, trafficCars);
     self.postMessage({ ok: true, result: result });
   } catch (error) {
     self.postMessage({
@@ -117,7 +118,7 @@ self.onmessage = function (event) {
         reject(new Error(`${message}${line}${col}`));
       };
 
-      worker.postMessage({ graph, startId, goalId });
+      worker.postMessage({ graph, startId, goalId, trafficCars });
     });
 
     if (!result || typeof result !== 'object') {
@@ -229,6 +230,16 @@ function buildAnimationAttempt(graph, path, startId, goalId) {
   return { animPath, reachedGoal, issue };
 }
 
+function pathHasLoop(path) {
+  if (!Array.isArray(path)) return false;
+  const seen = new Set();
+  for (const nodeId of path) {
+    if (seen.has(nodeId)) return true;
+    seen.add(nodeId);
+  }
+  return false;
+}
+
 function sanitizeInput(correctAlgorithm, difficulty) {
   const normalizedAlgo = normalizeAlgorithm(correctAlgorithm);
   const normalizedDifficulty = normalizeDifficulty(difficulty);
@@ -322,6 +333,7 @@ async function initializeSimulation() {
 
   const reset = () => {
     visualizer.stopAnimation();
+    visualizer.setPlayerMood('neutral');
     visualizer.draw({
       visitedNodes: [],
       path: [],
@@ -356,8 +368,15 @@ async function initializeSimulation() {
     resetButton.disabled = true;
 
     try {
+      visualizer.setPlayerMood('neutral');
+      await visualizer.waitForPlayerSprite(1500, 'neutral');
       const selected = getSelectedSolver(solverOptions) || 'algorithm';
-      const studentSolution = await runStudent(scene.graph, scene.startId, scene.goalId);
+      const studentSolution = await runStudent(
+        scene.graph,
+        scene.startId,
+        scene.goalId,
+        scene.trafficCars || []
+      );
 
       const path = studentSolution.path ?? [];
       const visitedNodes = studentSolution.visitedNodes ?? [];
@@ -381,6 +400,7 @@ async function initializeSimulation() {
       });
 
       if (attempt.animPath.length < 2) {
+        visualizer.setPlayerMood('neutral');
         visualizer.draw({
           visitedNodes: traversedNodes,
           path: attempt.animPath,
@@ -402,16 +422,40 @@ async function initializeSimulation() {
 
       const studentCost = computePathCost(scene.graph, path);
       if (animationResult.crashed) {
+        visualizer.setPlayerMood('carcrash');
+        await visualizer.waitForPlayerSprite(800, 'carcrash');
         updateScoreUI({ correctnessScore: 0, optimalityScore: 0, efficiencyScore: 0, totalScore: 0 });
       }
 
       let finalStatus = '';
+      const hasLoop = pathHasLoop(path);
       if (animationResult.crashed) {
         finalStatus = `Crashed into traffic at ${animationResult.crashNodeId}. This run is incorrect.`;
       } else if (!attempt.reachedGoal || attempt.issue) {
+        if (hasLoop) {
+          visualizer.setPlayerMood('carcrash');
+          await visualizer.waitForPlayerSprite(800, 'carcrash');
+        } else {
+          visualizer.setPlayerMood('neutral');
+        }
         finalStatus = `Incorrect: ${attempt.issue}`;
       } else {
+        visualizer.setPlayerMood('happy');
+        await visualizer.waitForPlayerSprite(1200, 'happy');
         finalStatus = `Done. Cost ${studentCost}, optimal ${optimalSolution.cost}.`;
+      }
+
+      // Keep the crash frame untouched (offset stop point + fire effect).
+      // For non-crash results, render final frame at endpoint with selected mood.
+      if (!animationResult.crashed) {
+        const endNodeId = attempt.animPath[attempt.animPath.length - 1] || scene.startId;
+        visualizer.draw({
+          visitedNodes: traversedNodes,
+          path,
+          carNodeId: endNodeId,
+          carPoint: null,
+          crashed: false
+        });
       }
 
       updateRunUI({
@@ -440,6 +484,7 @@ async function initializeSimulation() {
       });
     } catch (err) {
       const selected = getSelectedSolver(solverOptions) || 'algorithm';
+      visualizer.setPlayerMood('carcrash');
       updateRunUI({
         status: `Run failed: ${err.message}`,
         path: [],

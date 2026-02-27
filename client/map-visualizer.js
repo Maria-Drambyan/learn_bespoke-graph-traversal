@@ -14,6 +14,15 @@ function angleFromPoints(from, to) {
   return Math.atan2(to.y - from.y, to.x - from.x);
 }
 
+function uprightAngle(angle) {
+  let a = angle;
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  if (a > Math.PI / 2) a -= Math.PI;
+  if (a < -Math.PI / 2) a += Math.PI;
+  return a;
+}
+
 function edgeHash(a, b) {
   const s = `${a}|${b}`;
   let h = 0;
@@ -29,14 +38,26 @@ export class MapVisualizer {
     this.ctx = this.canvas.getContext('2d');
     this.scene = null;
     this.nodeById = new Map();
-    this.playerSprite = null;
-    this.playerSpriteReady = false;
-    this.playerSpriteFailed = false;
+    this.playerSprites = {
+      neutral: null,
+      happy: null,
+      carcrash: null
+    };
+    this.playerSpriteState = {
+      neutral: { ready: false, failed: false, waiters: [] },
+      happy: { ready: false, failed: false, waiters: [] },
+      carcrash: { ready: false, failed: false, waiters: [] }
+    };
+    this.playerMood = 'neutral';
+    this._spriteWaiters = [];
 
-    this.animationSpeed = 0.02;
+    this.animationSpeed = 0.012;
     this._animationFrame = null;
+    this._lastDrawState = null;
 
-    this.loadPlayerSprite();
+    this.loadPlayerSprite('neutral', ['neutral.svg', 'neutral-cosmo-2.svg', 'neutral-cosmo-2.png']);
+    this.loadPlayerSprite('happy', ['happy.svg']);
+    this.loadPlayerSprite('carcrash', ['carcrash.svg']);
   }
 
   setScene(scene) {
@@ -58,31 +79,76 @@ export class MapVisualizer {
     }
   }
 
-  loadPlayerSprite() {
-    const candidates = [
-      '/neutral-cosmo-2.png',
-      '/assets/neutral-cosmo-2.png',
-      './assets/neutral-cosmo-2.png'
-    ];
+  loadPlayerSprite(mood, files) {
+    const state = this.playerSpriteState[mood];
+    const candidates = files.flatMap((file) => ([
+      `/${file}`,
+      `/assets/${file}`,
+      `./assets/${file}`
+    ]));
 
     const tryLoad = (index) => {
       if (index >= candidates.length) {
-        this.playerSpriteFailed = true;
+        state.failed = true;
+        const waiters = state.waiters.splice(0);
+        waiters.forEach((resolve) => resolve(false));
         return;
       }
 
       const img = new Image();
       img.onload = () => {
-        this.playerSprite = img;
-        this.playerSpriteReady = true;
+        this.playerSprites[mood] = img;
+        state.ready = true;
+        const waiters = state.waiters.splice(0);
+        waiters.forEach((resolve) => resolve(true));
+        // Redraw current frame immediately once sprite is ready.
+        if (this.scene && this._lastDrawState) {
+          this.draw(this._lastDrawState);
+        }
       };
       img.onerror = () => {
+        if (index + 1 >= candidates.length) {
+          state.failed = true;
+          const waiters = state.waiters.splice(0);
+          waiters.forEach((resolve) => resolve(false));
+          return;
+        }
         tryLoad(index + 1);
       };
       img.src = `${candidates[index]}?v=1`;
     };
 
     tryLoad(0);
+  }
+
+  setPlayerMood(mood) {
+    if (!this.playerSpriteState[mood]) return;
+    this.playerMood = mood;
+    if (this.scene && this._lastDrawState) {
+      this.draw(this._lastDrawState);
+    }
+  }
+
+  waitForPlayerSprite(timeoutMs = 1200, mood = 'neutral') {
+    const state = this.playerSpriteState[mood];
+    if (!state) return Promise.resolve(false);
+    if (state.ready) return Promise.resolve(true);
+    if (state.failed) return Promise.resolve(false);
+
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        const idx = state.waiters.indexOf(onReady);
+        if (idx >= 0) state.waiters.splice(idx, 1);
+        resolve(false);
+      }, timeoutMs);
+
+      const onReady = (ok) => {
+        clearTimeout(timer);
+        resolve(ok);
+      };
+
+      state.waiters.push(onReady);
+    });
   }
 
   draw({
@@ -97,6 +163,16 @@ export class MapVisualizer {
     if (!this.scene) {
       return;
     }
+
+    this._lastDrawState = {
+      visitedNodes: [...visitedNodes],
+      path: [...path],
+      carNodeId,
+      carPoint,
+      carAngle,
+      crashed,
+      crashEffect
+    };
 
     const ctx = this.ctx;
     const { canvas } = this;
@@ -413,6 +489,7 @@ export class MapVisualizer {
 
     const startNode = this.nodeById.get(this.scene.startId);
     const goalNode = this.nodeById.get(this.scene.goalId);
+
     if (startNode) {
       ctx.fillStyle = danger;
       ctx.beginPath();
@@ -442,37 +519,35 @@ export class MapVisualizer {
 
     const player = carPoint ?? (carNodeId ? this.nodeById.get(carNodeId) : null);
     if (player) {
-      if (this.playerSpriteReady && this.playerSprite) {
+      const sprite = this.playerSprites[this.playerMood] || this.playerSprites.neutral;
+      if (sprite) {
         this.drawPlayerSprite(player.x, player.y, 0, carAngle);
-      } else {
-        this.drawCar(player.x, player.y, danger, 0, carAngle);
-      }
-      if (crashed) {
-        this.drawCrashEffect(crashEffect ?? { x: player.x, y: player.y - 28 });
       }
     }
   }
 
   drawPlayerSprite(x, y, shakeLevel, angle = 0) {
     const ctx = this.ctx;
-    if (!this.playerSprite) {
+    const sprite = this.playerSprites[this.playerMood] || this.playerSprites.neutral;
+    if (!sprite) {
       return;
     }
 
     const jitterX = shakeLevel > 0 ? (Math.random() - 0.5) * shakeLevel * 1.4 : 0;
     const jitterY = shakeLevel > 0 ? (Math.random() - 0.5) * shakeLevel * 1.4 : 0;
 
-    // Draw exact sprite shape (no rotation, no stretching), scaled uniformly.
-    const maxSize = 56;
-    const srcW = this.playerSprite.naturalWidth || this.playerSprite.width || maxSize;
-    const srcH = this.playerSprite.naturalHeight || this.playerSprite.height || maxSize;
+    // Draw sprite with route-facing rotation so movement direction is visible.
+    const maxSize = 82;
+    const srcW = sprite.naturalWidth || sprite.width || maxSize;
+    const srcH = sprite.naturalHeight || sprite.height || maxSize;
     const scale = Math.min(maxSize / srcW, maxSize / srcH);
     const drawW = srcW * scale;
     const drawH = srcH * scale;
 
     ctx.save();
     ctx.translate(x + jitterX, y + jitterY);
-    ctx.drawImage(this.playerSprite, -drawW / 2, -drawH / 2, drawW, drawH);
+    ctx.rotate(uprightAngle(angle));
+    ctx.drawImage(sprite, -drawW / 2, -drawH / 2, drawW, drawH);
     ctx.restore();
   }
 
@@ -628,7 +703,7 @@ export class MapVisualizer {
         previousTs = ts;
         seconds += dt;
 
-        t += this.animationSpeed + dt * 0.24;
+        t += this.animationSpeed + dt * 0.16;
 
         while (t >= 1 && segmentIndex < points.length - 1) {
           t -= 1;

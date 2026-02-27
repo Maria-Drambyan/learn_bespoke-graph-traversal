@@ -25,30 +25,64 @@
 }
 
 .run-controls-card {
-  gap: var(--UI-Spacing-spacing-s);
-  padding: var(--UI-Spacing-spacing-mxs);
-  max-width: 300px;
+  gap: var(--UI-Spacing-spacing-xs);
+  padding: var(--UI-Spacing-spacing-s);
+  max-width: 320px;
 }
 
 .run-controls-card .heading-xxxsmall {
-  margin: 0 0 var(--UI-Spacing-spacing-xxs);
+  margin: 0 0 var(--UI-Spacing-spacing-min);
 }
 
 .run-controls-card .label-medium {
-  margin-top: var(--UI-Spacing-spacing-xxs);
+  margin-top: 0;
+  font-size: var(--Fonts-Special-sm);
+  letter-spacing: 1.15px;
+  color: var(--Colors-Text-Body-Medium);
+}
+
+.run-controls-inline {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--UI-Spacing-spacing-ms);
+  border-top: 1px solid var(--Colors-Stroke-Default);
+  padding-top: var(--UI-Spacing-spacing-xs);
+}
+
+.solver-group {
+  min-width: 120px;
 }
 
 .control-row {
-  margin-top: var(--UI-Spacing-spacing-xs);
-  flex-wrap: wrap;
+  margin-top: 0;
+  flex-wrap: nowrap;
   gap: var(--UI-Spacing-spacing-s);
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.control-row .button {
+  flex: 0 0 auto;
+  min-width: 0;
+  white-space: nowrap;
+  padding-left: var(--UI-Spacing-spacing-s);
+  padding-right: var(--UI-Spacing-spacing-s);
+}
+
+#run-btn {
+  min-width: 120px;
+  height: 40px;
+  font-size: var(--Fonts-Body-Default-md);
 }
 
 .algorithm-options {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: var(--UI-Spacing-spacing-s);
   margin-top: var(--UI-Spacing-spacing-xs);
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .score-grid {
@@ -93,7 +127,7 @@
 #map-canvas {
   width: 100%;
   height: auto;
-  aspect-ratio: 6 / 4;
+  aspect-ratio: 6 / 3.7;
   border-radius: var(--UI-Radius-radius-m);
   border: 1.5px solid var(--Colors-Stroke-Default);
   background: var(--Colors-Base-Accent-Green-200);
@@ -136,7 +170,17 @@
   }
 
   .control-row .button {
-    width: 100%;
+    width: auto;
+  }
+
+  .run-controls-inline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .algorithm-options {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .hud-row {
