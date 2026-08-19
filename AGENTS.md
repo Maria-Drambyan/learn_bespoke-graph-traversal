@@ -117,3 +117,15 @@ When working on applications built with this template:
    component classes and usage
 4. **Maintain consistency** with the template's structure and patterns
 5. **Keep guidelines up to date** by editing this AGENTS.md file as the codebase evolves
+
+## Simulation Configuration
+
+The two-algorithm solver choice is optional. It is shown by default and can be
+hidden with any of these equivalent settings:
+
+- Query string: `?showAlgorithmChoice=false` (or `?algorithmChoice=false`)
+- Page config: `window.__SIM_CONFIG__ = { showAlgorithmChoice: false }`
+- Build environment: `VITE_SHOW_ALGORITHM_CHOICE=false`
+
+When the choice is hidden—or when its HTML is omitted—the simulation uses the
+configured correct algorithm for status logging and continues to run normally.

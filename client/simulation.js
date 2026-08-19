@@ -35,6 +35,16 @@ function normalizeDifficulty(rawValue) {
   return null;
 }
 
+function normalizeBoolean(rawValue, fallback) {
+  if (typeof rawValue === 'boolean') return rawValue;
+  if (rawValue === undefined || rawValue === null || rawValue === '') return fallback;
+
+  const value = String(rawValue).trim().toLowerCase();
+  if (['true', '1', 'yes', 'on'].includes(value)) return true;
+  if (['false', '0', 'no', 'off'].includes(value)) return false;
+  return fallback;
+}
+
 async function runStudent(graph, startId, goalId, trafficCars = []) {
   const candidateBaseUrls = [
     './solution.js',
@@ -257,12 +267,28 @@ function getInputDefaultsFromEnv() {
   const configAlgo = globalConfig.correctAlgorithm || globalConfig.algorithm;
   const configDifficulty = globalConfig.difficulty || globalConfig.level;
 
-  const envAlgo = import.meta.env.VITE_CORRECT_ALGO || 'bfs';
-  const envDifficulty = import.meta.env.VITE_DIFFICULTY || 'medium';
+  const queryShowAlgorithmChoice = params.has('showAlgorithmChoice')
+    ? params.get('showAlgorithmChoice')
+    : params.get('algorithmChoice');
+  const configShowAlgorithmChoice = globalConfig.showAlgorithmChoice
+    ?? globalConfig.algorithmChoice;
+
+  const buildEnv = import.meta.env || {};
+  const envAlgo = buildEnv.VITE_CORRECT_ALGO || 'bfs';
+  const envDifficulty = buildEnv.VITE_DIFFICULTY || 'medium';
+  const envShowAlgorithmChoice = buildEnv.VITE_SHOW_ALGORITHM_CHOICE;
 
   const correctAlgorithm = queryAlgo || configAlgo || envAlgo;
   const difficulty = queryDifficulty || configDifficulty || envDifficulty;
-  return sanitizeInput(String(correctAlgorithm), String(difficulty));
+  const showAlgorithmChoice = normalizeBoolean(
+    queryShowAlgorithmChoice ?? configShowAlgorithmChoice ?? envShowAlgorithmChoice,
+    true
+  );
+
+  return {
+    ...sanitizeInput(String(correctAlgorithm), String(difficulty)),
+    showAlgorithmChoice
+  };
 }
 
 function prettifyAlgo(name) {
@@ -277,6 +303,8 @@ function prettifyAlgo(name) {
 }
 
 function setupSolverChoices(containerEl, scene) {
+  if (!containerEl) return;
+
   const target = scene.meta.correctAlgorithm;
   const distractor = scene.meta.distractorAlgorithm;
   const values = [distractor, target];
@@ -310,6 +338,7 @@ function setupSolverChoices(containerEl, scene) {
 }
 
 function getSelectedSolver(containerEl) {
+  if (!containerEl) return '';
   const selected = containerEl.querySelector('input[name="solver-choice"]:checked');
   return selected ? selected.value : '';
 }
@@ -319,6 +348,7 @@ async function initializeSimulation() {
 
   const runButton = document.getElementById('run-btn');
   const resetButton = document.getElementById('reset-btn');
+  const solverGroup = document.getElementById('solver-group');
   const solverOptions = document.getElementById('algorithm-options');
 
   const defaults = getInputDefaultsFromEnv();
@@ -327,7 +357,13 @@ async function initializeSimulation() {
     difficulty: defaults.validDifficulty
   });
   visualizer.setScene(scene);
-  setupSolverChoices(solverOptions, scene);
+  const algorithmChoiceEnabled = defaults.showAlgorithmChoice && Boolean(solverOptions);
+  if (solverGroup) {
+    solverGroup.hidden = !algorithmChoiceEnabled;
+  }
+  if (algorithmChoiceEnabled) {
+    setupSolverChoices(solverOptions, scene);
+  }
 
   let running = false;
 
@@ -370,7 +406,7 @@ async function initializeSimulation() {
     try {
       visualizer.setPlayerMood('neutral');
       await visualizer.waitForPlayerSprite(1500, 'neutral');
-      const selected = getSelectedSolver(solverOptions) || 'algorithm';
+      const selected = getSelectedSolver(solverOptions) || scene.meta.correctAlgorithm;
       const studentSolution = await runStudent(
         scene.graph,
         scene.startId,
@@ -394,7 +430,9 @@ async function initializeSimulation() {
 
       updateScoreUI(score);
       updateRunUI({
-        status: `Running student solution (${selected.toUpperCase()})...`,
+        status: algorithmChoiceEnabled
+          ? `Running student solution (${prettifyAlgo(selected)})...`
+          : 'Running student solution...',
         path,
         visited: traversedNodes
       });
@@ -483,7 +521,7 @@ async function initializeSimulation() {
         }
       });
     } catch (err) {
-      const selected = getSelectedSolver(solverOptions) || 'algorithm';
+      const selected = getSelectedSolver(solverOptions) || scene.meta.correctAlgorithm;
       visualizer.setPlayerMood('carcrash');
       updateRunUI({
         status: `Run failed: ${err.message}`,
